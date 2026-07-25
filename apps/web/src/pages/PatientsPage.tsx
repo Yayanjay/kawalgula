@@ -29,7 +29,6 @@ export default function PatientsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Patient | null>(null);
   const [form, setForm] = useState({ name: "", waNumber: "", dob: "" });
-  const [dateOpen, setDateOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const fetchPatients = async () => {
@@ -204,26 +203,23 @@ export default function PatientsPage() {
               )}
               <div>
                 <label className="text-sm font-medium">Tanggal Lahir</label>
-                <Popover open={dateOpen} onOpenChange={setDateOpen}>
+                <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className={cn("w-full justify-start text-left font-normal h-auto py-2", !form.dob && "text-muted-foreground")}
+                      className={cn("w-full justify-start text-left font-normal", !form.dob && "text-muted-foreground")}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {form.dob ? format(new Date(form.dob), "dd/MM/yyyy") : "Pilih tanggal"}
+                      {form.dob ? format(new Date(form.dob), "dd/MM/yyyy") : <span>Pilih tanggal</span>}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+                  <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
                       selected={form.dob ? new Date(form.dob) : undefined}
-                      onSelect={(date) => {
-                        setForm({ ...form, dob: date ? format(date, "yyyy-MM-dd") : "" });
-                        setDateOpen(false);
-                      }}
-                      captionLayout="dropdown"
-                      fromYear={1940}
+                      onSelect={(date) => setForm({ ...form, dob: date ? format(date, "yyyy-MM-dd") : "" })}
+                      captionLayout="dropdown-buttons"
+                      fromYear={1950}
                       toYear={new Date().getFullYear()}
                       initialFocus
                     />
