@@ -219,8 +219,8 @@ export default function PatientsPage() {
                       selected={form.dob ? new Date(form.dob) : undefined}
                       onSelect={(date) => setForm({ ...form, dob: date ? format(date, "yyyy-MM-dd") : "" })}
                       captionLayout="dropdown"
-                      startMonth={new Date(1950, 0)}
-                      endMonth={new Date(2035, 11)}
+                      fromYear={1950}
+                      toYear={2035}
                       initialFocus
                     />
                   </PopoverContent>
