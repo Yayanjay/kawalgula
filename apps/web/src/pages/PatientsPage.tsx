@@ -218,6 +218,9 @@ export default function PatientsPage() {
                       mode="single"
                       selected={form.dob ? new Date(form.dob) : undefined}
                       onSelect={(date) => setForm({ ...form, dob: date ? format(date, "yyyy-MM-dd") : "" })}
+                      captionLayout="dropdown"
+                      fromYear={1940}
+                      toYear={new Date().getFullYear()}
                       initialFocus
                     />
                   </PopoverContent>
