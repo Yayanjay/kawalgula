@@ -66,7 +66,7 @@ function Calendar({
           const options = React.Children.toArray(children) as React.ReactElement<
             React.HTMLProps<HTMLOptionElement>
           >[]
-          const selectedOption = options.find((child) => child.props.value === value)
+          const selectedOption = options.find((child) => String(child.props.value) === String(value))
           const handleChange = (newValue: string) => {
             const changeEvent = {
               target: { value: newValue },
