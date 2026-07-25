@@ -1,14 +1,20 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
 import api from "../lib/api";
 import { useToast } from "../lib/toast";
 import type { PaginationResponse } from "@kawalgula/shared";
-import { UserPlus, Send, Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { UserPlus, Send, Pencil, Trash2, ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
+import { Button } from "../components/ui/button";
+import { Calendar } from "../components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
+import { cn } from "../lib/utils";
 
 interface Patient {
   id: string;
   name: string;
   waNumber: string;
+  dob: string | null;
   consentStatus: string;
   _count: { patientMedications: number };
 }
@@ -50,7 +56,7 @@ export default function PatientsPage() {
 
   const openEdit = (p: Patient) => {
     setEditing(p);
-    setForm({ name: p.name, waNumber: p.waNumber, dob: "" });
+    setForm({ name: p.name, waNumber: p.waNumber, dob: p.dob ? format(new Date(p.dob), "yyyy-MM-dd") : "" });
     setShowModal(true);
   };
 
@@ -59,9 +65,9 @@ export default function PatientsPage() {
     setSubmitting(true);
     try {
       if (editing) {
-        await api.patch(`/patients/${editing.id}`, { name: form.name });
+        await api.patch(`/patients/${editing.id}`, { name: form.name, dob: form.dob || null });
       } else {
-        await api.post("/patients", { name: form.name, waNumber: form.waNumber });
+        await api.post("/patients", { name: form.name, waNumber: form.waNumber, dob: form.dob || null });
       }
       setShowModal(false);
       fetchPatients();
@@ -195,6 +201,28 @@ export default function PatientsPage() {
                   <input type="text" value={form.waNumber} onChange={(e) => setForm({ ...form, waNumber: e.target.value })} className="w-full rounded-md border px-3 py-2 text-sm" placeholder="6281234567890" required />
                 </div>
               )}
+              <div>
+                <label className="text-sm font-medium">Tanggal Lahir</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn("w-full justify-start text-left font-normal", !form.dob && "text-muted-foreground")}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {form.dob ? format(new Date(form.dob), "dd/MM/yyyy") : "Pilih tanggal"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={form.dob ? new Date(form.dob) : undefined}
+                      onSelect={(date) => setForm({ ...form, dob: date ? format(date, "yyyy-MM-dd") : "" })}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 rounded-md border px-4 py-2 text-sm">Batal</button>
                 <button type="submit" disabled={submitting} className="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
