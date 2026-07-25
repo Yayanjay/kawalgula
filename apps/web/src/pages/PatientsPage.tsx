@@ -30,6 +30,7 @@ export default function PatientsPage() {
   const [editing, setEditing] = useState<Patient | null>(null);
   const [form, setForm] = useState({ name: "", waNumber: "", dob: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
 
   const fetchPatients = async () => {
     try {
@@ -203,7 +204,7 @@ export default function PatientsPage() {
               )}
               <div>
                 <label className="text-sm font-medium">Tanggal Lahir</label>
-                <Popover>
+                <Popover open={dateOpen} onOpenChange={setDateOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -217,7 +218,10 @@ export default function PatientsPage() {
                     <Calendar
                       mode="single"
                       selected={form.dob ? new Date(form.dob) : undefined}
-                      onSelect={(date) => setForm({ ...form, dob: date ? format(date, "yyyy-MM-dd") : "" })}
+                      onSelect={(date) => {
+                        setForm({ ...form, dob: date ? format(date, "yyyy-MM-dd") : "" });
+                        setDateOpen(false);
+                      }}
                       captionLayout="dropdown"
                       fromYear={1950}
                       toYear={2035}
