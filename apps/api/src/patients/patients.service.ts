@@ -123,8 +123,6 @@ export class PatientsService {
       },
     });
 
-    await this.sendOptIn(patient.id, patient.name, patient.waNumber);
-
     return { data: patient };
   }
 
