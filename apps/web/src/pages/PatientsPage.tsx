@@ -5,7 +5,6 @@ import api from "../lib/api";
 import { useToast } from "../lib/toast";
 import type { PaginationResponse } from "@kawalgula/shared";
 import { UserPlus, Send, Pencil, Trash2, ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
-import { Button } from "../components/ui/button";
 import { Calendar } from "../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { cn } from "../lib/utils";
@@ -205,13 +204,13 @@ export default function PatientsPage() {
                 <label className="text-sm font-medium">Tanggal Lahir</label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn("w-full justify-start text-left font-normal", !form.dob && "text-muted-foreground")}
+                    <button
+                      type="button"
+                      className={cn("w-full rounded-md border px-3 py-2 text-sm text-left", !form.dob && "text-muted-foreground")}
                     >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      <CalendarIcon className="mr-2 inline h-4 w-4" />
                       {form.dob ? format(new Date(form.dob), "dd/MM/yyyy") : "Pilih tanggal"}
-                    </Button>
+                    </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
