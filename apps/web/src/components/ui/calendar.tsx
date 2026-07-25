@@ -2,10 +2,17 @@
 
 import * as React from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { DayPicker } from "react-day-picker"
+import { DayPicker, DropdownProps } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 
@@ -22,16 +29,16 @@ function Calendar({
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
-        caption: "flex items-center pt-1 relative justify-center",
-        caption_label: "text-sm font-medium hidden",
-        caption_dropdowns: "flex justify-center gap-1 z-10",
-        nav: "absolute inset-x-0 top-0 flex w-full items-center justify-between pointer-events-none",
+        caption: "flex justify-center pt-1 relative items-center gap-1",
+        caption_label: "hidden",
+        caption_dropdowns: "flex justify-center gap-2 z-10 w-full items-center",
+        nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
-          "pointer-events-auto h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
+          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
         ),
-        nav_button_previous: "ml-1",
-        nav_button_next: "mr-1",
+        nav_button_previous: "absolute left-1",
+        nav_button_next: "absolute right-1",
         table: "w-full border-collapse space-y-1",
         head_row: "flex",
         head_cell:
@@ -40,7 +47,7 @@ function Calendar({
         cell: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
         day: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
+          "h-9 w-9 p-0 font-normal aria-selected:opacity-100"
         ),
         day_selected:
           "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
@@ -50,14 +57,43 @@ function Calendar({
         day_range_middle:
           "aria-selected:bg-accent aria-selected:text-accent-foreground",
         day_hidden: "invisible",
-        dropdown: "flex items-center text-sm font-medium bg-background border rounded-md px-2 py-1 cursor-pointer focus:outline-none",
-        dropdown_month: "mr-1",
-        dropdown_year: "",
         ...classNames,
       }}
       components={{
         IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
         IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
+        Dropdown: ({ value, onChange, children, ...dropdownProps }: DropdownProps) => {
+          const options = React.Children.toArray(children) as React.ReactElement<
+            React.HTMLProps<HTMLOptionElement>
+          >[]
+          const selectedOption = options.find((child) => child.props.value === value)
+          const handleChange = (newValue: string) => {
+            const changeEvent = {
+              target: { value: newValue },
+            } as React.ChangeEvent<HTMLSelectElement>
+            onChange?.(changeEvent)
+          }
+          return (
+            <Select
+              value={value?.toString()}
+              onValueChange={(val) => handleChange(val)}
+            >
+              <SelectTrigger className="h-8 pr-1.5 pl-2.5 text-xs font-medium focus:ring-0 shadow-none border-input bg-transparent">
+                <SelectValue>{selectedOption?.props.children}</SelectValue>
+              </SelectTrigger>
+              <SelectContent position="popper" className="max-h-60">
+                {options.map((option, id) => (
+                  <SelectItem
+                    key={`${option.props.value}-${id}`}
+                    value={option.props.value?.toString() ?? ""}
+                  >
+                    {option.props.children}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )
+        },
       }}
       {...props}
     />
