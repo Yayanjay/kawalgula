@@ -50,7 +50,11 @@ export class WahaWebhookService {
   private async handleMessage(payload: any) {
     if (!payload?.from) return;
 
+    if (payload.fromMe === true) return;
+
     const from = payload.from;
+    this.logger.log(`Webhook message from="${from}" body="${(payload.body || "").slice(0, 80)}"`);
+
     let patient: any = null;
 
     if (from.includes("@lid")) {
@@ -61,26 +65,27 @@ export class WahaWebhookService {
           OR: [{ lid: normalizedLid }, { lid: `${normalizedLid}@lid` }],
         },
       });
-    } else {
-      const waNumber = from.replace("@c.us", "");
-      patient = await this.prisma.patient.findUnique({ where: { waNumber, active: true } });
-    }
 
-    if (!patient) {
-      const lid = from.replace("@lid", "");
-      const phone = await this.waha.getPhoneByLid(lid);
-      if (phone) {
-        patient = await this.prisma.patient.findUnique({ where: { waNumber: phone, active: true } });
-        if (patient) {
-          await this.prisma.patient.update({ where: { id: patient.id }, data: { lid } });
+      if (!patient) {
+        const phone = await this.waha.getPhoneByLid(normalizedLid);
+        if (phone) {
+          patient = await this.prisma.patient.findUnique({ where: { waNumber: phone, active: true } });
+          if (patient) {
+            await this.prisma.patient.update({ where: { id: patient.id }, data: { lid: normalizedLid } });
+          }
         }
+      }
+    } else {
+      const waNumber = from.replace("@c.us", "").replace(/\D/g, "");
+      this.logger.log(`Extracted waNumber="${waNumber}" from from="${from}"`);
+      patient = await this.prisma.patient.findUnique({ where: { waNumber, active: true } });
+      if (!patient) {
+        this.logger.warn(`Webhook: no patient for waNumber="${waNumber}" from="${from}"`);
+        return;
       }
     }
 
-    if (!patient) {
-      this.logger.warn(`Webhook: no patient found for from="${from}"`);
-      return;
-    }
+    this.logger.log(`Webhook: patient found id=${patient.id} name=${patient.name} consent=${patient.consentStatus}`);
 
     if (patient.consentStatus !== "opted_in") {
       this.logger.log(`Webhook: processing consent for ${patient.name} (${patient.waNumber})`);
@@ -173,8 +178,16 @@ export class WahaWebhookService {
     const body = payload?.body || "";
     const input = (buttonText + " " + body).toLowerCase().trim();
 
+    this.logger.log(
+      `handleConsent: patientId=${patientId} token="${token}" body="${(body || "").slice(0, 100)}" input="${input.slice(0, 100)}"`,
+    );
+
     const isDeclined = /nanti/i.test(input) || /tidak/i.test(input) || /batal/i.test(input);
     const isAgreed = (token && input.includes(token.toLowerCase())) || /setuju/i.test(input) || /ya/i.test(input);
+
+    this.logger.log(
+      `handleConsent: isAgreed=${isAgreed} isDeclined=${isDeclined} tokenMatch=${token ? input.includes(token.toLowerCase()) : "no-token"}`,
+    );
 
     const chatId = `${waNumber}@c.us`;
 
