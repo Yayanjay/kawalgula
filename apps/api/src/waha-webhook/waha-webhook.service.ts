@@ -57,6 +57,9 @@ export class WahaWebhookService {
 
     let patient: any = null;
 
+    const body = payload.body || "";
+    const tokenMatch = body.match(/[a-f0-9]{8}/i);
+
     if (from.includes("@lid")) {
       const normalizedLid = from.replace("@lid", "");
       patient = await this.prisma.patient.findFirst({
@@ -71,7 +74,7 @@ export class WahaWebhookService {
         if (phone) {
           patient = await this.prisma.patient.findUnique({ where: { waNumber: phone, active: true } });
           if (patient) {
-            await this.prisma.patient.update({ where: { id: patient.id }, data: { lid: normalizedLid } });
+            await this.prisma.patient.update({ where: { id: patient.id }, data: { lid: normalizedLid } }).catch(() => {});
           }
         }
       }
@@ -79,10 +82,19 @@ export class WahaWebhookService {
       const waNumber = from.replace("@c.us", "").replace(/\D/g, "");
       this.logger.log(`Extracted waNumber="${waNumber}" from from="${from}"`);
       patient = await this.prisma.patient.findUnique({ where: { waNumber, active: true } });
-      if (!patient) {
-        this.logger.warn(`Webhook: no patient for waNumber="${waNumber}" from="${from}"`);
-        return;
+    }
+
+    if (!patient && tokenMatch) {
+      patient = await this.prisma.patient.findFirst({ where: { enrollmentToken: tokenMatch[0].toLowerCase(), active: true } });
+      if (patient && from.includes("@lid")) {
+        const normalizedLid = from.replace("@lid", "");
+        await this.prisma.patient.update({ where: { id: patient.id }, data: { lid: normalizedLid } }).catch(() => {});
       }
+    }
+
+    if (!patient) {
+      this.logger.warn(`Webhook: no patient for from="${from}"`);
+      return;
     }
 
     this.logger.log(`Webhook: patient found id=${patient.id} name=${patient.name} consent=${patient.consentStatus}`);
@@ -94,7 +106,6 @@ export class WahaWebhookService {
     }
 
     const buttonText = payload?.button?.text || payload?.buttonText || "";
-    const body = payload?.body || "";
     const input = (buttonText + " " + body).toLowerCase().trim();
 
     const isTaken = TAKEN_REGEX.test(input);
