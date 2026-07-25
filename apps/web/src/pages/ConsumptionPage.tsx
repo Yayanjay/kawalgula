@@ -6,8 +6,8 @@ import { Download, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface ConsumptionRow {
   id: string;
-  patient: { name: string; waNumber: string };
-  medication: { name: string };
+  patient: { name: string; waNumber: string } | null;
+  patientMedication: { medication: { name: string } } | null;
   status: string;
   source: string;
   reportedAt: string;
@@ -110,9 +110,9 @@ export default function ConsumptionPage() {
             {rows.map((r) => (
               <tr key={r.id} className="border-t hover:bg-muted/30">
                 <td className="px-4 py-3">{new Date(r.reportedAt).toLocaleString("id-ID")}</td>
-                <td className="px-4 py-3 font-medium">{r.patient.name}</td>
-                <td className="px-4 py-3">{r.patient.waNumber}</td>
-                <td className="px-4 py-3">{r.medication.name}</td>
+                <td className="px-4 py-3 font-medium">{r.patient?.name || "-"}</td>
+                <td className="px-4 py-3">{r.patient?.waNumber || "-"}</td>
+                <td className="px-4 py-3">{r.patientMedication?.medication?.name || "-"}</td>
                 <td className="px-4 py-3">{statusBadge(r.status)}</td>
                 <td className="px-4 py-3 text-muted-foreground">{sourceLabels[r.source] || r.source}</td>
               </tr>
