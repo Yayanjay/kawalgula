@@ -5,6 +5,7 @@ import api from "../lib/api";
 import { useToast } from "../lib/toast";
 import type { PaginationResponse } from "@kawalgula/shared";
 import { UserPlus, Send, Pencil, Trash2, ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
+import { Button } from "../components/ui/button";
 import { Calendar } from "../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { cn } from "../lib/utils";
@@ -28,6 +29,7 @@ export default function PatientsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Patient | null>(null);
   const [form, setForm] = useState({ name: "", waNumber: "", dob: "" });
+  const [dateOpen, setDateOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const fetchPatients = async () => {
@@ -202,21 +204,24 @@ export default function PatientsPage() {
               )}
               <div>
                 <label className="text-sm font-medium">Tanggal Lahir</label>
-                <Popover>
+                <Popover open={dateOpen} onOpenChange={setDateOpen}>
                   <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      className={cn("w-full rounded-md border px-3 py-2 text-sm text-left", !form.dob && "text-muted-foreground")}
+                    <Button
+                      variant="outline"
+                      className={cn("w-full justify-start text-left font-normal h-auto py-2", !form.dob && "text-muted-foreground")}
                     >
-                      <CalendarIcon className="mr-2 inline h-4 w-4" />
+                      <CalendarIcon className="mr-2 h-4 w-4" />
                       {form.dob ? format(new Date(form.dob), "dd/MM/yyyy") : "Pilih tanggal"}
-                    </button>
+                    </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
+                  <PopoverContent className="w-auto overflow-hidden p-0" align="start">
                     <Calendar
                       mode="single"
                       selected={form.dob ? new Date(form.dob) : undefined}
-                      onSelect={(date) => setForm({ ...form, dob: date ? format(date, "yyyy-MM-dd") : "" })}
+                      onSelect={(date) => {
+                        setForm({ ...form, dob: date ? format(date, "yyyy-MM-dd") : "" });
+                        setDateOpen(false);
+                      }}
                       captionLayout="dropdown"
                       fromYear={1940}
                       toYear={new Date().getFullYear()}
