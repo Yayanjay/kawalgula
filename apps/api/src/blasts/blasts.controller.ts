@@ -40,6 +40,11 @@ export class BlastsController {
     return this.blastsService.send(id);
   }
 
+  @Post(":id/retry-failed")
+  async retryFailed(@Param("id") id: string) {
+    return this.blastsService.retryFailed(id);
+  }
+
   @Delete(":id")
   async delete(@Param("id") id: string) {
     return this.blastsService.delete(id);

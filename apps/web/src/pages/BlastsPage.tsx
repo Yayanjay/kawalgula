@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import api from "../lib/api";
 import { useToast } from "../lib/toast";
-import { Send, Trash2, Upload, Image, ChevronLeft, ChevronRight } from "lucide-react";
+import { Send, Trash2, Upload, Image, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import type { PaginationResponse } from "@kawalgula/shared";
 
 interface Blast {
@@ -142,6 +142,17 @@ export default function BlastsPage() {
     }
   };
 
+  const handleRetry = async (id: string) => {
+    if (!confirm("Kirim ulang ke penerima yang gagal?")) return;
+    try {
+      await api.post(`/blasts/${id}/retry-failed`);
+      fetchBlasts();
+      toast("Pengiriman ulang selesai");
+    } catch (err: any) {
+      toast(err.response?.data?.message || "Gagal mengirim ulang", "error");
+    }
+  };
+
   const openDetail = async (blast: Blast) => {
     setSelectedBlast(blast);
     try {
@@ -204,6 +215,11 @@ export default function BlastsPage() {
                         </button>
                       </>
                     )}
+                    {b.status === "sent" && b.failCount > 0 && (
+                      <button onClick={() => handleRetry(b.id)} className="rounded p-1 hover:bg-muted text-amber-600" title="Kirim ulang yang gagal">
+                        <RefreshCw className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -227,7 +243,14 @@ export default function BlastsPage() {
         <div className="rounded-lg border p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold">{selectedBlast.title}</h3>
-            <button onClick={() => setSelectedBlast(null)} className="text-xs text-muted-foreground hover:text-foreground">Tutup</button>
+            <div className="flex items-center gap-2">
+              {selectedBlast.status === "sent" && selectedBlast.failCount > 0 && (
+                <button onClick={() => handleRetry(selectedBlast.id)} className="flex items-center gap-1 rounded-md border border-amber-200 text-amber-700 px-2 py-1 text-xs hover:bg-amber-50">
+                  <RefreshCw className="h-3 w-3" /> Retry Gagal
+                </button>
+              )}
+              <button onClick={() => setSelectedBlast(null)} className="text-xs text-muted-foreground hover:text-foreground">Tutup</button>
+            </div>
           </div>
           <p className="text-sm whitespace-pre-wrap text-muted-foreground">{selectedBlast.body}</p>
           {selectedBlast.mediaUrl && (

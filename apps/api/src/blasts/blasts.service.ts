@@ -217,4 +217,95 @@ export class BlastsService {
 
     return { data: updated };
   }
+
+  async retryFailed(id: string) {
+    const blast = await this.prisma.blast.findUnique({ where: { id } });
+    if (!blast) {
+      throw new NotFoundException("Broadcast tidak ditemukan");
+    }
+    if (blast.status !== "sent") {
+      throw new BadRequestException("Hanya broadcast terkirim yang bisa di-retry");
+    }
+
+    const failed = await this.prisma.blastRecipient.findMany({
+      where: { blastId: id, status: "failed" },
+    });
+
+    if (!failed.length) {
+      throw new BadRequestException("Tidak ada penerima yang gagal");
+    }
+
+    let newSuccess = 0;
+    let newFail = 0;
+
+    for (const recipient of failed) {
+      const chatId = `${recipient.waNumber}@c.us`;
+      const renderedBody = renderTemplate(blast.body, {
+        name: recipient.patientName,
+      });
+
+      try {
+        let wahaMessageId: string;
+        if (blast.mediaUrl) {
+          const absoluteUrl = this.resolveUrl(blast.mediaUrl);
+          wahaMessageId = await this.waha.sendImage(chatId, absoluteUrl, renderedBody);
+        } else {
+          wahaMessageId = await this.waha.sendText(chatId, renderedBody);
+        }
+
+        await this.prisma.blastRecipient.update({
+          where: { id: recipient.id },
+          data: { status: "sent", wahaMessageId, sentAt: new Date(), error: null },
+        });
+
+        await this.prisma.outboundMessage.create({
+          data: {
+            patientId: recipient.patientId,
+            kind: "blast",
+            payload: { blastId: id, body: renderedBody, mediaUrl: blast.mediaUrl },
+            wahaMessageId,
+            status: "sent",
+            createdById: "SYSTEM",
+          },
+        });
+
+        newSuccess++;
+      } catch (error: any) {
+        await this.prisma.outboundMessage.create({
+          data: {
+            patientId: recipient.patientId,
+            kind: "blast",
+            payload: { blastId: id, body: renderedBody, mediaUrl: blast.mediaUrl },
+            status: "failed",
+            error: error.message,
+            createdById: "SYSTEM",
+          },
+        });
+
+        newFail++;
+      }
+
+      if (failed.length > 1) {
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+    }
+
+    const remainingFailed = await this.prisma.blastRecipient.count({
+      where: { blastId: id, status: "failed" },
+    });
+
+    const totalSent = await this.prisma.blastRecipient.count({
+      where: { blastId: id, status: "sent" },
+    });
+
+    const updated = await this.prisma.blast.update({
+      where: { id },
+      data: {
+        successCount: totalSent,
+        failCount: remainingFailed,
+      },
+    });
+
+    return { data: updated };
+  }
 }
