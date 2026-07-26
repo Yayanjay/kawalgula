@@ -1,31 +1,30 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { PaginationRequest } from "@kawalgula/shared";
 
 @Injectable()
 export class ConsumptionService {
   constructor(private prisma: PrismaService) {}
 
-  async list(dto: PaginationRequest & { patientId?: string }) {
-    const { page = 1, size = 10, search, sort, patientId } = dto;
+  async list(dto: { patientId?: string; startDate?: string; endDate?: string; page?: number; size?: number; sort?: { key: string; direction: string }[]; search?: { key: string[]; value: string } }) {
+    const { page = 1, size = 10, search, sort, patientId, startDate, endDate } = dto;
     const skip = (page - 1) * size;
 
     const where: any = {};
     if (patientId) {
       where.patientId = patientId;
     }
+    if (startDate || endDate) {
+      where.reportedAt = {};
+      if (startDate) where.reportedAt.gte = new Date(startDate);
+      if (endDate) where.reportedAt.lte = new Date(endDate);
+    }
     if (search?.value && search?.key?.length) {
       const keys = search.key.filter((k) =>
-        ["patientName", "medicationName"].includes(k),
+        ["medicationName"].includes(k),
       );
       if (keys.length) {
         where.OR = [];
         for (const k of keys) {
-          if (k === "patientName") {
-            where.OR.push({
-              patient: { name: { contains: search.value, mode: "insensitive" } },
-            });
-          }
           if (k === "medicationName") {
             where.OR.push({
               patientMedication: {
@@ -74,7 +73,37 @@ export class ConsumptionService {
     };
   }
 
-  async exportCsv(dto: PaginationRequest & { patientId?: string }) {
+  async summary(dto: { patientId?: string; startDate?: string; endDate?: string }) {
+    const { patientId, startDate, endDate } = dto;
+
+    const where: any = {};
+    if (patientId) where.patientId = patientId;
+    if (startDate || endDate) {
+      where.reportedAt = {};
+      if (startDate) where.reportedAt.gte = new Date(startDate);
+      if (endDate) where.reportedAt.lte = new Date(endDate);
+    }
+
+    const rows = await this.prisma.consumptionLog.findMany({
+      where,
+      select: { status: true },
+    });
+
+    const total = rows.length;
+    let taken = 0;
+    let skipped = 0;
+    let missed = 0;
+
+    for (const r of rows) {
+      if (r.status === "taken") taken++;
+      else if (r.status === "skipped") skipped++;
+      else if (r.status === "missed") missed++;
+    }
+
+    return { data: { total, taken, skipped, missed } };
+  }
+
+  async exportCsv(dto: { patientId?: string; startDate?: string; endDate?: string }) {
     const { data: rows } = await this.list({ ...dto, page: 1, size: 10000 });
 
     let csv = "Tanggal,Nama Pasien,WA Number,Nama Obat,Status,Sumber\n";

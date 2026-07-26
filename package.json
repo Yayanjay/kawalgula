@@ -25,10 +25,11 @@
     "onlyBuiltDependencies": [
       "@prisma/client",
       "@prisma/engines",
-      "prisma",
       "bcrypt",
+      "core-js",
       "esbuild",
-      "msgpackr-extract"
+      "msgpackr-extract",
+      "prisma"
     ],
     "publicHoistPattern": [
       "@prisma/client"
