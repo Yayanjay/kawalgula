@@ -2,8 +2,8 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-  InternalServerErrorException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../prisma/prisma.service";
 import { WahaClientService } from "../waha-client/waha-client.service";
 import { renderTemplate, PaginationRequest } from "@kawalgula/shared";
@@ -11,10 +11,25 @@ import { CreateBlastDto } from "./dto/create-blast.dto";
 
 @Injectable()
 export class BlastsService {
+  private mediaBaseUrl: string;
+
   constructor(
     private prisma: PrismaService,
     private waha: WahaClientService,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.mediaBaseUrl = config.get<string>(
+      "MEDIA_BASE_URL",
+      "http://localhost:3000",
+    );
+  }
+
+  private resolveUrl(path: string): string {
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+      return path;
+    }
+    return `${this.mediaBaseUrl}${path}`;
+  }
 
   async create(dto: CreateBlastDto, adminId: string) {
     const blast = await this.prisma.blast.create({
@@ -142,7 +157,8 @@ export class BlastsService {
       try {
         let wahaMessageId: string;
         if (blast.mediaUrl) {
-          wahaMessageId = await this.waha.sendImage(chatId, blast.mediaUrl, renderedBody);
+          const absoluteUrl = this.resolveUrl(blast.mediaUrl);
+          wahaMessageId = await this.waha.sendImage(chatId, absoluteUrl, renderedBody);
         } else {
           wahaMessageId = await this.waha.sendText(chatId, renderedBody);
         }

@@ -68,7 +68,7 @@ export class WahaClientService {
       const { data } = await this.client.post("/api/sendImage", {
         session: this.sessionName,
         chatId,
-        image: { url: imageUrl },
+        file: { url: imageUrl },
         caption,
       });
       const id = data?.id;

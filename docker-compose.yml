@@ -55,6 +55,8 @@ services:
     ports:
       - "3010:3000"
     env_file: .env
+    environment:
+      MEDIA_BASE_URL: http://api:3000
     depends_on:
       postgres:
         condition: service_healthy
