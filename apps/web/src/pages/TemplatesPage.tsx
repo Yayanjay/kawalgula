@@ -88,7 +88,7 @@ export default function TemplatesPage() {
       const { data } = await api.post("/templates/list", {
         page: 1,
         size: 20,
-        sort: [{ key: "key", direction: "ASC" }],
+        sort: [{ key: "type", direction: "ASC" }],
       });
       setTemplates(data.data);
     } catch {
