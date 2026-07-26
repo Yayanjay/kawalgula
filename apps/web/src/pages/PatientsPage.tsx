@@ -171,6 +171,7 @@ export default function PatientsPage() {
             <tr>
                 <th className="px-4 py-3 text-left">Nama</th>
                 <th className="px-4 py-3 text-left">No. WA</th>
+                <th className="px-4 py-3 text-left">Tgl. Lahir</th>
                 <th className="px-4 py-3 text-left">Daftar</th>
                 <th className="px-4 py-3 text-left">Pengobatan</th>
                 <th className="px-4 py-3 text-left">Obat</th>
@@ -179,12 +180,13 @@ export default function PatientsPage() {
           </thead>
           <tbody>
             {patients.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Belum ada data pasien</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Belum ada data pasien</td></tr>
             )}
             {patients.map((p) => (
               <tr key={p.id} className="border-t hover:bg-muted/30">
                 <td className="px-4 py-3 font-medium cursor-pointer" onClick={() => navigate(`/patients/${p.id}/medications`)}>{p.name}</td>
                 <td className="px-4 py-3">{p.waNumber}</td>
+                <td className="px-4 py-3">{p.dob ? format(new Date(p.dob), "dd/MM/yyyy") : "-"}</td>
                 <td className="px-4 py-3">{consentBadge(p.consentStatus)}</td>
                 <td className="px-4 py-3">{treatmentBadge(p.treatmentStatus)}</td>
                 <td className="px-4 py-3">{p._count.patientMedications}</td>

@@ -31,6 +31,8 @@ interface Assignment {
 interface Patient {
   id: string;
   name: string;
+  dob: string | null;
+  waNumber: string;
 }
 
 interface ConsumptionRow {
@@ -237,6 +239,11 @@ export default function PatientMedicationsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold">Obat {patient?.name || "..."}</h2>
+          {patient && (
+            <p className="text-sm text-muted-foreground">
+              {patient.waNumber}{patient.dob ? ` · ${format(new Date(patient.dob), "dd/MM/yyyy")}` : ""}
+            </p>
+          )}
           <p className="text-sm text-muted-foreground">Pilih obat dari daftar dan atur jadwal</p>
         </div>
       </div>
