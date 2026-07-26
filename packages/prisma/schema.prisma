@@ -140,6 +140,8 @@ model Reminder {
   sentAt              DateTime?      @map("sent_at")
   wahaMessageId       String?        @map("waha_message_id")
   manual              Boolean        @default(false) @map("manual")
+  retryCount          Int            @default(0) @map("retry_count")
+  nextRetryAt         DateTime?      @map("next_retry_at")
   createdAt           DateTime       @default(now()) @map("created_at")
   updatedAt           DateTime       @default(now()) @updatedAt @map("updated_at")
   createdById         String         @default("SYSTEM") @map("created_by_id")
@@ -208,4 +210,15 @@ model OutboundMessage {
   @@index([patientId])
   @@index([status])
   @@map("outbound_messages")
+}
+
+model GeneralParameter {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  name      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("general_parameters")
 }

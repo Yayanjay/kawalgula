@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { WahaClientService } from "../waha-client/waha-client.service";
+import { GeneralParametersService } from "../general-parameters/general-parameters.service";
 import { renderTemplate } from "@kawalgula/shared";
 import { DateTime } from "luxon";
 
@@ -11,6 +12,7 @@ export class RemindersService {
   constructor(
     private prisma: PrismaService,
     private waha: WahaClientService,
+    private generalParameters: GeneralParametersService,
   ) {}
 
   async seedReminders() {
@@ -64,26 +66,51 @@ export class RemindersService {
 
   async dispatchReminders(patientMedicationId?: string) {
     const now = new Date();
+    const maxRetries = await this.generalParameters.getInt(
+      "reminder_max_retries",
+      3,
+    );
 
-    const where: any = { status: "pending" };
+    const pendingWhere: any = { status: "pending" };
     if (patientMedicationId) {
-      where.patientMedicationId = patientMedicationId;
+      pendingWhere.patientMedicationId = patientMedicationId;
     } else {
-      where.scheduledAt = { lte: now };
+      pendingWhere.scheduledAt = { lte: now };
     }
 
-    const pending = await this.prisma.reminder.findMany({
-      where,
-      include: {
-        patient: true,
-        patientMedication: {
-          include: { medication: true },
-        },
-      },
-      take: 50,
-    });
+    const retryWhere: any = {
+      status: "sent",
+      nextRetryAt: { lte: now },
+      retryCount: { lt: maxRetries },
+    };
+    if (patientMedicationId) {
+      retryWhere.patientMedicationId = patientMedicationId;
+    }
 
-    for (const reminder of pending) {
+    const includeClause = {
+      patient: true,
+      patientMedication: {
+        include: { medication: true },
+      },
+    };
+
+    const [pending, retries] = await Promise.all([
+      this.prisma.reminder.findMany({
+        where: pendingWhere,
+        include: includeClause,
+        take: 50,
+      }),
+      this.prisma.reminder.findMany({
+        where: retryWhere,
+        include: includeClause,
+        take: 50,
+      }),
+    ]);
+
+    const reminders = [...pending, ...retries];
+
+    for (const reminder of reminders) {
+      const isRetry = reminder.status === "sent";
       const template = await this.prisma.templateMessage.findUnique({
         where: { key: "reminder" },
       });
@@ -102,15 +129,23 @@ export class RemindersService {
 
       try {
         const wahaMessageId = await this.waha.sendText(chatId, text);
-        this.logger.log(`Reminder sent to ${reminder.patient.name} for ${reminder.patientMedication.medication.name}`);
+        this.logger.log(
+          `${isRetry ? "Retry" : "Reminder"} sent to ${reminder.patient.name} for ${reminder.patientMedication.medication.name}`,
+        );
+
+        const updateData: any = {
+          sentAt: new Date(),
+          wahaMessageId,
+        };
+        if (!isRetry) {
+          updateData.status = "sent";
+        } else {
+          updateData.nextRetryAt = null;
+        }
 
         await this.prisma.reminder.update({
           where: { id: reminder.id },
-          data: {
-            status: "sent",
-            sentAt: new Date(),
-            wahaMessageId,
-          },
+          data: updateData,
         });
 
         await this.prisma.outboundMessage.create({
@@ -124,7 +159,9 @@ export class RemindersService {
           },
         });
       } catch (error: any) {
-        this.logger.error(`Reminder failed for ${reminder.patient.name}: ${error.message}`);
+        this.logger.error(
+          `${isRetry ? "Retry" : "Reminder"} failed for ${reminder.patient.name}: ${error.message}`,
+        );
         await this.prisma.reminder.update({
           where: { id: reminder.id },
           data: { status: "failed" },

@@ -10,6 +10,7 @@ import { PatientsModule } from "./patients/patients.module";
 import { MedicationsModule } from "./medications/medications.module";
 import { PatientMedicationsModule } from "./patient-medications/patient-medications.module";
 import { QueueModule } from "./queue/queue.module";
+import { GeneralParametersModule } from "./general-parameters/general-parameters.module";
 import { RemindersModule } from "./reminders/reminders.module";
 import { WahaWebhookModule } from "./waha-webhook/waha-webhook.module";
 import { ConsumptionModule } from "./consumption/consumption.module";
@@ -44,6 +45,7 @@ import { join } from "path";
     MedicationsModule,
     PatientMedicationsModule,
     QueueModule,
+    GeneralParametersModule,
     RemindersModule,
     WahaWebhookModule,
     ConsumptionModule,

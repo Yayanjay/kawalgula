@@ -63,7 +63,28 @@ async function main() {
     });
   }
 
-  console.log("Seed completed: admin + default template messages created.");
+  const params = [
+    {
+      key: "reminder_max_retries",
+      value: "3",
+      name: "Maksimal percobaan ulang pengingat",
+    },
+    {
+      key: "reminder_retry_interval_minutes",
+      value: "30",
+      name: "Interval percobaan ulang (menit)",
+    },
+  ];
+
+  for (const param of params) {
+    await prisma.generalParameter.upsert({
+      where: { key: param.key },
+      update: param,
+      create: param,
+    });
+  }
+
+  console.log("Seed completed: admin + default template messages + general parameters created.");
 }
 
 main()

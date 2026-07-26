@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { WahaClientService } from "../waha-client/waha-client.service";
 import { WhatsappSessionService } from "../whatsapp-session/whatsapp-session.service";
+import { GeneralParametersService } from "../general-parameters/general-parameters.service";
 import { renderTemplate } from "@kawalgula/shared";
 
 const TAKEN_REGEX = /sudah|selesai|udah|minum/i;
@@ -15,6 +16,7 @@ export class WahaWebhookService {
     private prisma: PrismaService,
     private waha: WahaClientService,
     private whatsappSession: WhatsappSessionService,
+    private generalParameters: GeneralParametersService,
   ) {}
 
   async handleEvent(body: any) {
@@ -125,7 +127,6 @@ export class WahaWebhookService {
       return;
     }
 
-    const status = isTaken ? "taken" : "skipped";
     const source = buttonText ? "button" : "free_text";
 
     const recentReminder = await this.prisma.reminder.findFirst({
@@ -137,44 +138,98 @@ export class WahaWebhookService {
     });
 
     if (recentReminder) {
-      await this.prisma.reminder.update({
-        where: { id: recentReminder.id },
-        data: { status: "confirmed" },
-      });
+      if (isTaken) {
+        await this.prisma.reminder.update({
+          where: { id: recentReminder.id },
+          data: { status: "confirmed" },
+        });
 
-      await this.prisma.consumptionLog.create({
-        data: {
-          patientId: patient.id,
-          patientMedicationId: recentReminder.patientMedicationId,
-          reminderId: recentReminder.id,
-          status,
-          source,
-          rawText: buttonText || body || null,
-          createdById: "SYSTEM",
-        },
-      });
-      this.logger.log(`Consumption: ${status} by ${patient.name} via ${source}`);
-    } else {
-      const assignment = await this.prisma.patientMedication.findFirst({
-        where: { patientId: patient.id, active: true },
-        orderBy: { createdAt: "desc" },
-      });
-
-      if (assignment) {
         await this.prisma.consumptionLog.create({
           data: {
             patientId: patient.id,
-            patientMedicationId: assignment.id,
-            status,
+            patientMedicationId: recentReminder.patientMedicationId,
+            reminderId: recentReminder.id,
+            status: "taken",
             source,
             rawText: buttonText || body || null,
             createdById: "SYSTEM",
           },
         });
+        this.logger.log(`Consumption: taken by ${patient.name} via ${source}`);
+
+        await this.waha.sendText(
+          `${patient.waNumber}@c.us`,
+          `Tercatat. Terima kasih.`,
+        );
+      } else {
+        const maxRetries = await this.generalParameters.getInt(
+          "reminder_max_retries",
+          3,
+        );
+        const intervalMinutes = await this.generalParameters.getInt(
+          "reminder_retry_interval_minutes",
+          30,
+        );
+
+        if (recentReminder.retryCount < maxRetries) {
+          const nextRetryAt = new Date(
+            Date.now() + intervalMinutes * 60 * 1000,
+          );
+
+          await this.prisma.reminder.update({
+            where: { id: recentReminder.id },
+            data: {
+              retryCount: { increment: 1 },
+              nextRetryAt,
+            },
+          });
+          this.logger.log(
+            `Retry scheduled for reminder ${recentReminder.id}: retry ${recentReminder.retryCount + 1}/${maxRetries} at ${nextRetryAt.toISOString()}`,
+          );
+
+          await this.waha.sendText(
+            `${patient.waNumber}@c.us`,
+            `Tercatat. Kami akan mengingatkan lagi nanti.`,
+          );
+        } else {
+          await this.prisma.reminder.update({
+            where: { id: recentReminder.id },
+            data: { status: "confirmed" },
+          });
+
+          await this.prisma.consumptionLog.create({
+            data: {
+              patientId: patient.id,
+              patientMedicationId: recentReminder.patientMedicationId,
+              reminderId: recentReminder.id,
+              status: "skipped",
+              source,
+              rawText: buttonText || body || null,
+              createdById: "SYSTEM",
+            },
+          });
+          this.logger.log(
+            `Consumption: skipped (retries exhausted) by ${patient.name} via ${source}`,
+          );
+
+          await this.waha.sendText(
+            `${patient.waNumber}@c.us`,
+            `Baik, dicatat sebagai lewati untuk jadwal ini.`,
+          );
+        }
+      }
+    } else {
+      const template = await this.prisma.templateMessage.findUnique({
+        where: { key: "usage_hint" },
+      });
+
+      if (template) {
+        await this.waha.sendText(
+          `${patient.waNumber}@c.us`,
+          `${template.title}\n\n${template.body}`,
+        );
       }
     }
-
-    await this.waha.sendText(`${patient.waNumber}@c.us`, `Tercatat. Terima kasih.`);
   }
 
   private async handleConsent(
