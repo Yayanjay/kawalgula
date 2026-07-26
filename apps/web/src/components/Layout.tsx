@@ -7,6 +7,7 @@ import {
   Smartphone,
   LogOut,
   LayoutDashboard,
+  Megaphone,
 } from "lucide-react";
 import SessionStatusIndicator from "./SessionStatusIndicator";
 
@@ -17,6 +18,7 @@ const navItems = [
   { to: "/medications", label: "Obat", icon: Pill },
   { to: "/templates", label: "Template Pesan", icon: FileText },
   { to: "/consumption", label: "Konsumsi", icon: Activity },
+  { to: "/blasts", label: "Broadcast", icon: Megaphone },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {

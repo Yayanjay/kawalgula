@@ -8,6 +8,7 @@ import PatientMedicationsPage from "./pages/PatientMedicationsPage";
 import MedicationsPage from "./pages/MedicationsPage";
 import TemplatesPage from "./pages/TemplatesPage";
 import ConsumptionPage from "./pages/ConsumptionPage";
+import BlastsPage from "./pages/BlastsPage";
 import NotFoundPage from "./pages/NotFoundPage";
 
 function App() {
@@ -27,6 +28,7 @@ function App() {
                 <Route path="/medications" element={<MedicationsPage />} />
                 <Route path="/templates" element={<TemplatesPage />} />
                 <Route path="/consumption" element={<ConsumptionPage />} />
+                <Route path="/blasts" element={<BlastsPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Layout>

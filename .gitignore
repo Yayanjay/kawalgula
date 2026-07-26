@@ -6,3 +6,8 @@ dist/
 *.db-journal
 .sessions/
 *.tsbuildinfo
+
+# Uploads (user-uploaded media)
+uploads/
+# but keep the source code module
+!apps/api/src/uploads/

@@ -18,7 +18,7 @@
     "@types/bcrypt": "^5.0.2",
     "bcrypt": "^5.1.1",
     "concurrently": "^9.1.0",
-    "prisma": "^6.2.0",
+    "prisma": "6.19.3",
     "tsx": "^4.19.0"
   },
   "pnpm": {
@@ -30,6 +30,8 @@
       "esbuild",
       "msgpackr-extract"
     ],
-    "publicHoistPattern": ["@prisma/client"]
+    "publicHoistPattern": [
+      "@prisma/client"
+    ]
   }
 }

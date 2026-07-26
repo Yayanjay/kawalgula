@@ -45,7 +45,7 @@ COPY --from=builder /app/pnpm-workspace.yaml .
 COPY --from=builder /app/package.json .
 COPY --from=builder /app/pnpm-lock.yaml .
 
-RUN chmod +x apps/api/entrypoint.sh
+RUN chmod +x apps/api/entrypoint.sh && mkdir -p /app/uploads
 
 EXPOSE 3000
 

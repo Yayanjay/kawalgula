@@ -14,6 +14,8 @@ import { GeneralParametersModule } from "./general-parameters/general-parameters
 import { RemindersModule } from "./reminders/reminders.module";
 import { WahaWebhookModule } from "./waha-webhook/waha-webhook.module";
 import { ConsumptionModule } from "./consumption/consumption.module";
+import { UploadsModule } from "./uploads/uploads.module";
+import { BlastsModule } from "./blasts/blasts.module";
 import { HealthController } from "./health.controller";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { join } from "path";
@@ -35,6 +37,14 @@ import { join } from "path";
       exclude: ["/api/(.*)"],
       serveRoot: "/",
     }),
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), "uploads"),
+      serveRoot: "/uploads",
+      serveStaticOptions: {
+        index: false,
+        maxAge: "1d",
+      },
+    }),
     PrismaModule,
     RedisModule,
     AuthModule,
@@ -49,6 +59,8 @@ import { join } from "path";
     RemindersModule,
     WahaWebhookModule,
     ConsumptionModule,
+    UploadsModule,
+    BlastsModule,
   ],
   controllers: [HealthController],
 })

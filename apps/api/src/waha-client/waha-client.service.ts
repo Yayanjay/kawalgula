@@ -58,6 +58,31 @@ export class WahaClientService {
     }
   }
 
+  async sendImage(
+    chatId: string,
+    imageUrl: string,
+    caption?: string,
+  ): Promise<string> {
+    await this.ensureSessionWorking();
+    try {
+      const { data } = await this.client.post("/api/sendImage", {
+        session: this.sessionName,
+        chatId,
+        image: { url: imageUrl },
+        caption,
+      });
+      const id = data?.id;
+      if (id && typeof id === "object" && "id" in id) {
+        return String((id as Record<string, unknown>).id);
+      }
+      return (id as string) ?? "unknown";
+    } catch (error: any) {
+      throw new InternalServerErrorException(
+        `Gagal mengirim gambar WA: ${error.response?.data?.message || error.message}`,
+      );
+    }
+  }
+
   async sendText(chatId: string, text: string): Promise<string> {
     await this.ensureSessionWorking();
 

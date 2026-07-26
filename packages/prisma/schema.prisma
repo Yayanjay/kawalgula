@@ -46,11 +46,25 @@ enum AdminRole {
   superadmin
 }
 
+enum BlastStatus {
+  draft
+  sending
+  sent
+  cancelled
+}
+
+enum BlastRecipientStatus {
+  pending
+  sent
+  failed
+}
+
 enum OutboundKind {
   opt_in
   reminder
   usage_hint
   opt_in_confirm
+  blast
 }
 
 enum OutboundStatus {
@@ -69,6 +83,7 @@ model Admin {
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
 
   patients Patient[]
+  blasts   Blast[]
 
   @@map("admins")
 }
@@ -92,6 +107,7 @@ model Patient {
   reminders          Reminder[]
   consumptionLogs    ConsumptionLog[]
   outboundMessages   OutboundMessage[]
+  blastRecipients    BlastRecipient[]
 
   @@index([consentStatus])
   @@index([active])
@@ -210,6 +226,48 @@ model OutboundMessage {
   @@index([patientId])
   @@index([status])
   @@map("outbound_messages")
+}
+
+model Blast {
+  id              String      @id @default(cuid())
+  title           String
+  body            String
+  mediaUrl        String?     @map("media_url")
+  mediaType       String?     @map("media_type")
+  status          BlastStatus @default(draft)
+  scheduledAt     DateTime?   @map("scheduled_at")
+  sentAt          DateTime?   @map("sent_at")
+  totalRecipients Int         @default(0) @map("total_recipients")
+  successCount    Int         @default(0) @map("success_count")
+  failCount       Int         @default(0) @map("fail_count")
+  createdById     String      @map("created_by_id")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @default(now()) @updatedAt @map("updated_at")
+
+  recipients BlastRecipient[]
+  createdBy  Admin            @relation(fields: [createdById], references: [id])
+
+  @@map("blasts")
+}
+
+model BlastRecipient {
+  id            String                @id @default(cuid())
+  blastId       String                @map("blast_id")
+  patientId     String                @map("patient_id")
+  patientName   String                @map("patient_name")
+  waNumber      String                @map("wa_number")
+  status        BlastRecipientStatus  @default(pending)
+  wahaMessageId String?               @map("waha_message_id")
+  error         String?
+  sentAt        DateTime?             @map("sent_at")
+  createdAt     DateTime              @default(now()) @map("created_at")
+
+  blast   Blast   @relation(fields: [blastId], references: [id], onDelete: Cascade)
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([blastId])
+  @@index([patientId])
+  @@map("blast_recipients")
 }
 
 model GeneralParameter {

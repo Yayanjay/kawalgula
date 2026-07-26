@@ -42,6 +42,20 @@ export enum OutboundKind {
   REMINDER = "reminder",
   USAGE_HINT = "usage_hint",
   OPT_IN_CONFIRM = "opt_in_confirm",
+  BLAST = "blast",
+}
+
+export enum BlastStatus {
+  DRAFT = "draft",
+  SENDING = "sending",
+  SENT = "sent",
+  CANCELLED = "cancelled",
+}
+
+export enum BlastRecipientStatus {
+  PENDING = "pending",
+  SENT = "sent",
+  FAILED = "failed",
 }
 
 export enum OutboundStatus {
