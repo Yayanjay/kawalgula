@@ -53,6 +53,7 @@ export default function BlastsPage() {
   const [blasts, setBlasts] = useState<Blast[]>([]);
   const [pagination, setPagination] = useState<PaginationResponse | null>(null);
   const [page, setPage] = useState(1);
+  const [showHistory, setShowHistory] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [selectedBlast, setSelectedBlast] = useState<Blast | null>(null);
   const [recipients, setRecipients] = useState<BlastRecipient[]>([]);
@@ -61,11 +62,13 @@ export default function BlastsPage() {
   const [sending, setSending] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const displayed = showHistory ? blasts : blasts.filter((b) => b.status === "draft");
+
   const fetchBlasts = async () => {
     try {
       const { data } = await api.post("/blasts/list", {
         page,
-        size: 10,
+        size: 50,
         sort: [{ key: "createdAt", direction: "DESC" }],
       });
       setBlasts(data.data);
@@ -172,6 +175,21 @@ export default function BlastsPage() {
         </button>
       </div>
 
+      <div className="flex gap-2 flex-wrap">
+        <button
+          onClick={() => setShowHistory(false)}
+          className={`rounded-full px-4 py-1 text-sm border transition-colors ${!showHistory ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"}`}
+        >
+          Broadcast Aktif
+        </button>
+        <button
+          onClick={() => setShowHistory(true)}
+          className={`rounded-full px-4 py-1 text-sm border transition-colors ${showHistory ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"}`}
+        >
+          Riwayat
+        </button>
+      </div>
+
       <div className="rounded-lg border">
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/50">
@@ -185,10 +203,10 @@ export default function BlastsPage() {
             </tr>
           </thead>
           <tbody>
-            {blasts.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Belum ada broadcast</td></tr>
+            {displayed.length === 0 && (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">{showHistory ? "Belum ada riwayat broadcast" : "Belum ada broadcast draft"}</td></tr>
             )}
-            {blasts.map((b) => (
+            {displayed.map((b) => (
               <tr key={b.id} className="border-t hover:bg-muted/30">
                 <td className="px-4 py-3">
                   <button onClick={() => openDetail(b)} className="font-medium text-left hover:underline">
