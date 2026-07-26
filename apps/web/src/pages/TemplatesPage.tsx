@@ -50,6 +50,14 @@ function getTemplateInfo(key: string): TemplateInfo {
 
 const allTypes = ["reminder", "confirmation", "enrollment", "optin_confirm", "usage_hint", "already_opted_in"];
 
+const varDescriptions: Record<string, { label: string; example: string }> = {
+  name: { label: "Nama pasien", example: "Budi" },
+  medication_name: { label: "Nama obat", example: "Metformin" },
+  dosage: { label: "Dosis obat", example: "500mg" },
+  unit: { label: "Satuan obat", example: "tablet" },
+  token: { label: "Kode pendaftaran (token)", example: "abc12345" },
+};
+
 const sampleVars: Record<string, string> = {
   name: "Budi",
   medication_name: "Metformin",
@@ -224,6 +232,26 @@ export default function TemplatesPage() {
               <label className="text-xs font-medium block mb-0.5">Isi Pesan</label>
               <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={6} className="w-full rounded-md border px-3 py-2 text-sm font-mono text-xs" />
             </div>
+
+            {editing && getTemplateInfo(editing.key).vars.length > 0 && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3 space-y-1.5">
+                <p className="text-xs font-semibold text-blue-800">Variabel yang tersedia</p>
+                <p className="text-xs text-blue-600">Ketik kode variabel di dalam teks sesuai tempat yang diinginkan:</p>
+                <div className="space-y-1">
+                  {getTemplateInfo(editing.key).vars.map((v) => {
+                    const info = varDescriptions[v];
+                    if (!info) return null;
+                    return (
+                      <div key={v} className="flex items-center gap-2 text-xs">
+                        <code className="rounded bg-blue-100 px-1.5 py-0.5 font-mono text-blue-800 shrink-0">{`{{${v}}}`}</code>
+                        <span className="text-blue-700">{info.label}</span>
+                        <span className="text-blue-400">Contoh: <span className="italic">{info.example}</span></span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="rounded-xl border bg-muted/30 p-4">
               <p className="text-xs text-muted-foreground mb-2">Preview:</p>
