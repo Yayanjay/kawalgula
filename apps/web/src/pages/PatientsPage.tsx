@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import api from "../lib/api";
 import { useToast } from "../lib/toast";
 import type { PaginationResponse } from "@kawalgula/shared";
-import { UserPlus, Send, Pencil, Trash2, ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
+import { UserPlus, Send, Pencil, Trash2, CheckCircle2, RotateCcw, ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Calendar } from "../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
@@ -16,6 +16,7 @@ interface Patient {
   waNumber: string;
   dob: string | null;
   consentStatus: string;
+  treatmentStatus: string;
   _count: { patientMedications: number };
 }
 
@@ -88,6 +89,37 @@ export default function PatientsPage() {
     }
   };
 
+  const treatmentBadge = (status: string) => {
+    const map: Record<string, string> = {
+      active: "bg-green-100 text-green-800",
+      completed: "bg-blue-100 text-blue-800",
+      dropped_out: "bg-orange-100 text-orange-800",
+    };
+    const label: Record<string, string> = {
+      active: "Aktif",
+      completed: "Selesai",
+      dropped_out: "Berhenti",
+    };
+    return (
+      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${map[status] || "bg-gray-100"}`}>
+        {label[status] || status}
+      </span>
+    );
+  };
+
+  const handleTreatmentToggle = async (id: string, current: string) => {
+    const next = current === "active" ? "completed" : "active";
+    const msg = next === "completed" ? "Tandai pasien ini selesai pengobatan?" : "Aktifkan kembali pengobatan pasien ini?";
+    if (!confirm(msg)) return;
+    try {
+      await api.patch(`/patients/${id}`, { treatmentStatus: next });
+      fetchPatients();
+      toast(next === "completed" ? "Pasien ditandai selesai" : "Pasien diaktifkan kembali");
+    } catch (err: any) {
+      toast(err.response?.data?.message || "Gagal", "error");
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("Hapus pasien ini? Log konsumsi tetap tersimpan.")) return;
     try {
@@ -138,28 +170,40 @@ export default function PatientsPage() {
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/50">
             <tr>
-              <th className="px-4 py-3 text-left">Nama</th>
-              <th className="px-4 py-3 text-left">No. WA</th>
-              <th className="px-4 py-3 text-left">Status</th>
-              <th className="px-4 py-3 text-left">Obat</th>
-              <th className="px-4 py-3 text-right">Aksi</th>
-            </tr>
+                <th className="px-4 py-3 text-left">Nama</th>
+                <th className="px-4 py-3 text-left">No. WA</th>
+                <th className="px-4 py-3 text-left">Daftar</th>
+                <th className="px-4 py-3 text-left">Pengobatan</th>
+                <th className="px-4 py-3 text-left">Obat</th>
+                <th className="px-4 py-3 text-right">Aksi</th>
+              </tr>
           </thead>
           <tbody>
             {patients.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Belum ada data pasien</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Belum ada data pasien</td></tr>
             )}
             {patients.map((p) => (
               <tr key={p.id} className="border-t hover:bg-muted/30">
                 <td className="px-4 py-3 font-medium cursor-pointer" onClick={() => navigate(`/patients/${p.id}/medications`)}>{p.name}</td>
                 <td className="px-4 py-3">{p.waNumber}</td>
                 <td className="px-4 py-3">{consentBadge(p.consentStatus)}</td>
+                <td className="px-4 py-3">{treatmentBadge(p.treatmentStatus)}</td>
                 <td className="px-4 py-3">{p._count.patientMedications}</td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
                     {(p.consentStatus === "pending" || p.consentStatus === "opted_out") && (
                       <button onClick={() => handleResend(p.id)} className="rounded p-1 hover:bg-muted" title="Kirim ulang opt-in">
                         <Send className="h-4 w-4" />
+                      </button>
+                    )}
+                    {p.treatmentStatus === "active" && (
+                      <button onClick={() => handleTreatmentToggle(p.id, p.treatmentStatus)} className="rounded p-1 hover:bg-muted text-blue-600" title="Tandai selesai">
+                        <CheckCircle2 className="h-4 w-4" />
+                      </button>
+                    )}
+                    {p.treatmentStatus === "completed" && (
+                      <button onClick={() => handleTreatmentToggle(p.id, p.treatmentStatus)} className="rounded p-1 hover:bg-muted text-green-600" title="Aktifkan kembali">
+                        <RotateCcw className="h-4 w-4" />
                       </button>
                     )}
                     <button onClick={() => openEdit(p)} className="rounded p-1 hover:bg-muted" title="Edit">

@@ -40,7 +40,7 @@ export class PatientsService {
     const orderBy: any[] = [];
     if (sort?.length) {
       for (const s of sort) {
-        const allowedKeys = ["name", "waNumber", "createdAt", "consentStatus"];
+        const allowedKeys = ["name", "waNumber", "createdAt", "consentStatus", "treatmentStatus"];
         if (allowedKeys.includes(s.key)) {
           orderBy.push({ [s.key]: s.direction.toLowerCase() });
         }
@@ -64,6 +64,7 @@ export class PatientsService {
           consentStatus: true,
           consentAt: true,
           active: true,
+          treatmentStatus: true,
           createdAt: true,
           _count: { select: { patientMedications: true } },
         },
@@ -188,13 +189,23 @@ export class PatientsService {
       throw new NotFoundException("Pasien tidak ditemukan");
     }
 
+    const data: any = {
+      ...(dto.name !== undefined && { name: dto.name }),
+      ...(dto.dob !== undefined && { dob: dto.dob ? new Date(dto.dob) : undefined }),
+      ...(dto.treatmentStatus !== undefined && { treatmentStatus: dto.treatmentStatus as any }),
+    };
+
     const updated = await this.prisma.patient.update({
       where: { id },
-      data: {
-        ...(dto.name !== undefined && { name: dto.name }),
-        ...(dto.dob !== undefined && { dob: dto.dob ? new Date(dto.dob) : undefined }),
-      },
+      data,
     });
+
+    if (dto.treatmentStatus === "completed") {
+      await this.prisma.reminder.updateMany({
+        where: { patientId: id, status: { in: ["pending", "sent"] } },
+        data: { status: "missed" },
+      });
+    }
 
     return { data: updated };
   }

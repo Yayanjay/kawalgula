@@ -22,6 +22,7 @@ export class RemindersService {
       where: {
         consentStatus: "opted_in",
         active: true,
+        treatmentStatus: "active",
       },
       include: {
         patientMedications: {

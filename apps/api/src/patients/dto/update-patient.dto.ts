@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsDateString } from "class-validator";
+import { IsString, IsOptional, IsDateString, IsIn } from "class-validator";
 
 export class UpdatePatientDto {
   @IsString()
@@ -8,4 +8,9 @@ export class UpdatePatientDto {
   @IsDateString()
   @IsOptional()
   dob?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsIn(["active", "completed", "dropped_out"])
+  treatmentStatus?: string;
 }

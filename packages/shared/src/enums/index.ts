@@ -37,6 +37,12 @@ export enum AdminRole {
   SUPERADMIN = "superadmin",
 }
 
+export enum TreatmentStatus {
+  ACTIVE = "active",
+  COMPLETED = "completed",
+  DROPPED_OUT = "dropped_out",
+}
+
 export enum OutboundKind {
   OPT_IN = "opt_in",
   REMINDER = "reminder",

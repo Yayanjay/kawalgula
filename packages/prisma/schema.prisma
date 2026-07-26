@@ -59,6 +59,12 @@ enum BlastRecipientStatus {
   failed
 }
 
+enum TreatmentStatus {
+  active
+  completed
+  dropped_out
+}
+
 enum OutboundKind {
   opt_in
   reminder
@@ -98,6 +104,7 @@ model Patient {
   consentStatus ConsentStatus @default(pending) @map("consent_status")
   consentAt     DateTime?     @map("consent_at")
   active        Boolean       @default(true)
+  treatmentStatus TreatmentStatus @default(active) @map("treatment_status")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at")
   createdById   String        @map("created_by_id")
