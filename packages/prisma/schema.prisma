@@ -39,6 +39,7 @@ enum TemplateType {
   optin_confirm
   usage_hint
   already_opted_in
+  confirmation
 }
 
 enum AdminRole {

@@ -3,6 +3,7 @@ export interface TemplateVariables {
   medication_name?: string;
   dosage?: string;
   unit?: string;
+  token?: string;
 }
 
 export function renderTemplate(template: string, variables: TemplateVariables): string {

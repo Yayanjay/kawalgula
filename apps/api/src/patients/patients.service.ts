@@ -144,7 +144,12 @@ export class PatientsService {
       );
     }
 
-    const text = `Halo KawalGula, saya ingin mengikuti program DM tracker ${token}`;
+    const tpl = await this.prisma.templateMessage.findUnique({
+      where: { key: "wa_prefill" },
+    });
+    const text = tpl
+      ? renderTemplate(tpl.body, { token })
+      : `Halo KawalGula, saya ingin mengikuti program DM tracker ${token}`;
     const url = `https://wa.me/${botNumber}?text=${encodeURIComponent(text)}`;
     return { url };
   }
@@ -247,7 +252,7 @@ export class PatientsService {
     if (!template) return;
 
     const body = renderTemplate(template.body, { name });
-    const text = `${template.title}\n\n${body}\n\nBalas "setuju" untuk mendaftar atau "nanti" untuk menunda.`;
+    const text = `${template.title}\n\n${body}`;
 
     const lid = await this.resolveLid(waNumber, patientId);
     const targets = [`${waNumber}@c.us`];

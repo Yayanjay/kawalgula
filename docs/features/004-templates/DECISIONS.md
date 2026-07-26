@@ -1,7 +1,7 @@
 # 004 — Template Messages
 
 ## Motivation
-Admins can customize the WhatsApp message templates used by the system (enrollment, reminder, opt-in confirmation, usage hints). Templates support `{{variable}}` placeholders rendered at send time.
+Admins can customize the WhatsApp message templates used by the system (enrollment, reminder, opt-in confirmation, usage hints, response confirmations, and the wa.me deep-link prefill). Templates support `{{variable}}` placeholders rendered at send time.
 
 ## API contract
 
@@ -56,8 +56,8 @@ Uses `packages/shared/template-renderer/renderTemplate()` with the provided vari
 ## Data model
 - `TemplateMessage(id, type(TemplateType), key unique, title, body, buttonLabels String[] default [], updatedAt)`
 - `key` is the lookup identifier (e.g. `enrollment`, `reminder`, `optin_confirm`, `usage_hint`).
-- `type` enum: `enrollment`, `reminder`, `optin_confirm`, `usage_hint`, `already_opted_in`.
-- Seed creates all 5 default templates (see `packages/prisma/seed.ts`).
+- `type` enum: `enrollment`, `reminder`, `optin_confirm`, `usage_hint`, `already_opted_in`, `confirmation`.
+- Seed creates all 9 default templates (see `packages/prisma/seed.ts`).
 
 ## Decisions
 - **`key` is the stable identifier, not `id`** — endpoints use `/templates/:key`. `key` is immutable.
@@ -67,15 +67,23 @@ Uses `packages/shared/template-renderer/renderTemplate()` with the provided vari
 - **Preview endpoint uses POST** — variables can be arbitrary JSON object; `POST` is appropriate.
 - **No template version history** — MVP just updates in-place. If audit trail is needed later, add a `TemplateRevision` table.
 - **Template body support** — plain text with `\n` for line breaks. No Markdown, no HTML, no rich formatting for MVP. Emoji allowed but not encouraged for medical context.
+- **Instruction suffixes merged into parent templates** — the previous pattern of appending `Balas "setuju"...` and `Balas "sudah"...` as hardcoded suffixes has been eliminated. These instructions are now part of the `enrollment` and `reminder` template bodies respectively, editable from the dashboard.
+- **All outbound messages go through TemplateMessage** — every WhatsApp message sent to a patient references a template in the DB. No hardcoded strings remain in any service.
+- **`wa_prefill` template** — controls the pre-filled text in the `wa.me` QR enrollment link. Uses `{{token}}` variable.
 
-## Available variables (per template type)
-| Template | Variables |
-|---|---|
-| `enrollment` | `{{name}}` |
-| `reminder` | `{{name}}`, `{{medication_name}}`, `{{dosage}}`, `{{unit}}` |
-| `optin_confirm` | `{{name}}` |
-| `usage_hint` | none |
-| `already_opted_in` | `{{name}}` |
+## Available templates (keys)
+
+| key | type | event trigger | variables |
+|-----|------|--------------|-----------|
+| `enrollment` | enrollment | Kirim undangan pendaftaran ke pasien baru | `{{name}}` |
+| `wa_prefill` | enrollment | Isian otomatis link WA (QR enrollment) | `{{token}}` |
+| `reminder` | reminder | Jadwal minum obat tiba | `{{name}}`, `{{medication_name}}`, `{{dosage}}`, `{{unit}}` |
+| `optin_confirm` | optin_confirm | Pasien menyetujui pendaftaran | `{{name}}` |
+| `usage_hint` | usage_hint | Pesan tidak dikenali / bantuan cara balas | none |
+| `already_opted_in` | already_opted_in | Pasien sudah terdaftar (resend opt-in) | `{{name}}` |
+| `taken_confirm` | confirmation | Pasien menjawab "sudah" | `{{name}}` |
+| `belum_retry` | confirmation | Pasien menjawab "belum" (masih ada pengulangan) | `{{name}}` |
+| `belum_exhausted` | confirmation | Pasien menjawab "belum" (pengulangan habis) | `{{name}}` |
 
 ## Edge cases
 - Template key not found: `404`.

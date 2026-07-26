@@ -125,7 +125,7 @@ export class RemindersService {
         unit: reminder.patientMedication.medication.unit,
       });
 
-      const text = `${template.title}\n\n${body}\n\nBalas "sudah" jika sudah minum, "belum" jika belum.`;
+      const text = `${template.title}\n\n${body}`;
 
       try {
         const wahaMessageId = await this.waha.sendText(chatId, text);
@@ -209,7 +209,7 @@ export class RemindersService {
       dosage: pm.medication.dosage,
       unit: pm.medication.unit,
     });
-    const text = `${template.title}\n\n${body}\n\nBalas "sudah" jika sudah minum, "belum" jika belum.`;
+    const text = `${template.title}\n\n${body}`;
 
     try {
       const wahaMessageId = await this.waha.sendText(chatId, text);

@@ -157,10 +157,16 @@ export class WahaWebhookService {
         });
         this.logger.log(`Consumption: taken by ${patient.name} via ${source}`);
 
-        await this.waha.sendText(
-          `${patient.waNumber}@c.us`,
-          `Tercatat. Terima kasih.`,
-        );
+        const takenTpl = await this.prisma.templateMessage.findUnique({
+          where: { key: "taken_confirm" },
+        });
+        if (takenTpl) {
+          const msg = renderTemplate(takenTpl.body, { name: patient.name });
+          await this.waha.sendText(
+            `${patient.waNumber}@c.us`,
+            `${takenTpl.title}\n\n${msg}`,
+          );
+        }
       } else {
         const maxRetries = await this.generalParameters.getInt(
           "reminder_max_retries",
@@ -187,10 +193,16 @@ export class WahaWebhookService {
             `Retry scheduled for reminder ${recentReminder.id}: retry ${recentReminder.retryCount + 1}/${maxRetries} at ${nextRetryAt.toISOString()}`,
           );
 
-          await this.waha.sendText(
-            `${patient.waNumber}@c.us`,
-            `Tercatat. Kami akan mengingatkan lagi nanti.`,
-          );
+          const retryTpl = await this.prisma.templateMessage.findUnique({
+            where: { key: "belum_retry" },
+          });
+          if (retryTpl) {
+            const msg = renderTemplate(retryTpl.body, { name: patient.name });
+            await this.waha.sendText(
+              `${patient.waNumber}@c.us`,
+              `${retryTpl.title}\n\n${msg}`,
+            );
+          }
         } else {
           await this.prisma.reminder.update({
             where: { id: recentReminder.id },
@@ -212,10 +224,16 @@ export class WahaWebhookService {
             `Consumption: skipped (retries exhausted) by ${patient.name} via ${source}`,
           );
 
-          await this.waha.sendText(
-            `${patient.waNumber}@c.us`,
-            `Baik, dicatat sebagai lewati untuk jadwal ini.`,
-          );
+          const exhaustedTpl = await this.prisma.templateMessage.findUnique({
+            where: { key: "belum_exhausted" },
+          });
+          if (exhaustedTpl) {
+            const msg = renderTemplate(exhaustedTpl.body, { name: patient.name });
+            await this.waha.sendText(
+              `${patient.waNumber}@c.us`,
+              `${exhaustedTpl.title}\n\n${msg}`,
+            );
+          }
         }
       }
     } else {
@@ -310,7 +328,7 @@ export class WahaWebhookService {
     });
 
     if (template) {
-      const text = `${template.title}\n\n${template.body}\n\nBalas "setuju" untuk mendaftar atau "nanti" untuk menunda.`;
+      const text = `${template.title}\n\n${template.body}`;
       await this.waha.sendText(chatId, text);
     }
   }
