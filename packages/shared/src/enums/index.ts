@@ -30,6 +30,7 @@ export enum TemplateType {
   OPTIN_CONFIRM = "optin_confirm",
   USAGE_HINT = "usage_hint",
   ALREADY_OPTED_IN = "already_opted_in",
+  CONFIRMATION = "confirmation",
 }
 
 export enum AdminRole {

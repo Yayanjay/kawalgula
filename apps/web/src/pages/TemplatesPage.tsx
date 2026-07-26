@@ -132,6 +132,17 @@ export default function TemplatesPage() {
     setSubmitting(false);
   };
 
+  const handleReset = async (key: string) => {
+    if (!confirm("Reset template ini ke pengaturan awal?")) return;
+    try {
+      await api.post(`/templates/${key}/reset`);
+      await fetchTemplates();
+      toast("Template direset ke default");
+    } catch (err: any) {
+      toast(err.response?.data?.message || "Gagal mereset template", "error");
+    }
+  };
+
   const livePreview = useMemo(() => {
     if (!editing) return null;
     return { title: form.title, body: renderPreview(form.body) };
@@ -173,7 +184,7 @@ export default function TemplatesPage() {
           const info = getTemplateInfo(t.key);
           return (
             <div key={t.key} className="rounded-xl border bg-card hover:shadow-md transition-shadow">
-              <div className="p-4 space-y-3">
+              <div className="p-4 flex flex-col gap-3">
                 <div>
                   <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${typeColors[t.type] || "bg-gray-100 text-gray-700"}`}>
                     {typeLabels[t.type] || t.type}
@@ -191,12 +202,20 @@ export default function TemplatesPage() {
                     ))}
                   </div>
                 )}
-                <button
-                  onClick={() => openEdit(t)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent transition-colors"
-                >
-                  Edit
-                </button>
+                <div className="flex gap-2 mt-auto">
+                  <button
+                    onClick={() => openEdit(t)}
+                    className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleReset(t.key)}
+                    className="rounded-md border border-red-200 text-red-600 px-3 py-1.5 text-sm hover:bg-red-50 transition-colors"
+                  >
+                    Reset
+                  </button>
+                </div>
               </div>
             </div>
           );

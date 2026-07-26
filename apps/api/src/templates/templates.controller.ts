@@ -24,6 +24,11 @@ export class TemplatesController {
     return this.templatesService.update(key, dto);
   }
 
+  @Post(":key/reset")
+  async reset(@Param("key") key: string) {
+    return this.templatesService.reset(key);
+  }
+
   @Post("preview")
   async preview(@Body() body: { key: string; variables: TemplateVariables }) {
     return this.templatesService.preview(body.key, body.variables);
