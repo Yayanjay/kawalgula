@@ -3,6 +3,7 @@ import api from "../lib/api";
 import { useToast } from "../lib/toast";
 import { Send, Trash2, Upload, Image, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import type { PaginationResponse } from "@kawalgula/shared";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 interface Blast {
   id: string;
@@ -61,6 +62,9 @@ export default function BlastsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [sending, setSending] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [confirmSend, setConfirmSend] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [confirmRetry, setConfirmRetry] = useState<string | null>(null);
 
   const displayed = showHistory ? blasts : blasts.filter((b) => b.status === "draft");
 
@@ -121,7 +125,6 @@ export default function BlastsPage() {
   };
 
   const handleSend = async (id: string) => {
-    if (!confirm("Kirim broadcast ini ke semua pasien yang sudah setuju?")) return;
     setSending(true);
     try {
       await api.post(`/blasts/${id}/send`);
@@ -134,7 +137,6 @@ export default function BlastsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Hapus broadcast draft ini?")) return;
     try {
       await api.delete(`/blasts/${id}`);
       if (selectedBlast?.id === id) setSelectedBlast(null);
@@ -146,7 +148,6 @@ export default function BlastsPage() {
   };
 
   const handleRetry = async (id: string) => {
-    if (!confirm("Kirim ulang ke penerima yang gagal?")) return;
     try {
       await api.post(`/blasts/${id}/retry-failed`);
       fetchBlasts();
@@ -225,16 +226,16 @@ export default function BlastsPage() {
                   <div className="flex items-center justify-end gap-1">
                     {b.status === "draft" && (
                       <>
-                        <button onClick={() => handleSend(b.id)} disabled={sending} className="rounded p-1 hover:bg-muted text-blue-600" title="Kirim">
+                        <button onClick={() => setConfirmSend(b.id)} disabled={sending} className="rounded p-1 hover:bg-muted text-blue-600" title="Kirim">
                           <Send className="h-4 w-4" />
                         </button>
-                        <button onClick={() => handleDelete(b.id)} className="rounded p-1 hover:bg-muted text-red-500" title="Hapus">
+                        <button onClick={() => setConfirmDelete(b.id)} className="rounded p-1 hover:bg-muted text-red-500" title="Hapus">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </>
                     )}
                     {b.status === "sent" && b.failCount > 0 && (
-                      <button onClick={() => handleRetry(b.id)} className="rounded p-1 hover:bg-muted text-amber-600" title="Kirim ulang yang gagal">
+                      <button onClick={() => setConfirmRetry(b.id)} className="rounded p-1 hover:bg-muted text-amber-600" title="Kirim ulang yang gagal">
                         <RefreshCw className="h-4 w-4" />
                       </button>
                     )}
@@ -263,7 +264,7 @@ export default function BlastsPage() {
             <h3 className="font-semibold">{selectedBlast.title}</h3>
             <div className="flex items-center gap-2">
               {selectedBlast.status === "sent" && selectedBlast.failCount > 0 && (
-                <button onClick={() => handleRetry(selectedBlast.id)} className="flex items-center gap-1 rounded-md border border-amber-200 text-amber-700 px-2 py-1 text-xs hover:bg-amber-50">
+                <button onClick={() => setConfirmRetry(selectedBlast.id)} className="flex items-center gap-1 rounded-md border border-amber-200 text-amber-700 px-2 py-1 text-xs hover:bg-amber-50">
                   <RefreshCw className="h-3 w-3" /> Retry Gagal
                 </button>
               )}
@@ -308,6 +309,43 @@ export default function BlastsPage() {
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmSend}
+        onOpenChange={(o) => { if (!o) setConfirmSend(null); }}
+        title="Kirim Broadcast"
+        message="Kirim broadcast ini ke semua pasien yang sudah setuju?"
+        confirmLabel="Kirim"
+        onConfirm={() => {
+          if (confirmSend) handleSend(confirmSend);
+          setConfirmSend(null);
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        onOpenChange={(o) => { if (!o) setConfirmDelete(null); }}
+        title="Hapus Broadcast"
+        message="Hapus broadcast draft ini?"
+        confirmLabel="Hapus"
+        destructive
+        onConfirm={() => {
+          if (confirmDelete) handleDelete(confirmDelete);
+          setConfirmDelete(null);
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!confirmRetry}
+        onOpenChange={(o) => { if (!o) setConfirmRetry(null); }}
+        title="Kirim Ulang"
+        message="Kirim ulang ke penerima yang gagal?"
+        confirmLabel="Kirim Ulang"
+        onConfirm={() => {
+          if (confirmRetry) handleRetry(confirmRetry);
+          setConfirmRetry(null);
+        }}
+      />
 
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowCreate(false)}>

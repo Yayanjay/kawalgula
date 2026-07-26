@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import api from "../lib/api";
 import { useToast } from "../lib/toast";
 import { Plus, Trash2, Bell } from "lucide-react";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import EnrollmentQr from "../components/EnrollmentQr";
 
 interface MasterMedication {
@@ -34,6 +35,7 @@ export default function PatientMedicationsPage() {
   const [scheduleInput, setScheduleInput] = useState("");
   const [editing, setEditing] = useState<Assignment | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
@@ -80,7 +82,6 @@ export default function PatientMedicationsPage() {
   };
 
   const handleDelete = async (assignmentId: string) => {
-    if (!confirm("Hapus obat ini? Pengingat akan dihapus, log konsumsi tetap tersimpan.")) return;
     try {
       await api.delete(`/patient-medications/${assignmentId}`);
       fetchData();
@@ -177,13 +178,25 @@ export default function PatientMedicationsPage() {
                 <Bell className="h-4 w-4" />
               </button>
               <button onClick={() => handleEdit(a)} className="rounded p-1 hover:bg-muted text-sm">Edit</button>
-              <button onClick={() => handleDelete(a.id)} className="rounded p-1 hover:bg-muted text-red-500">
+              <button onClick={() => setConfirmDelete(a.id)} className="rounded p-1 hover:bg-muted text-red-500">
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
           </div>
         ))}
       </div>
+      <ConfirmDialog
+        open={!!confirmDelete}
+        onOpenChange={(o) => { if (!o) setConfirmDelete(null); }}
+        title="Hapus Obat"
+        message="Hapus obat ini? Pengingat akan dihapus, log konsumsi tetap tersimpan."
+        confirmLabel="Hapus"
+        destructive
+        onConfirm={() => {
+          if (confirmDelete) handleDelete(confirmDelete);
+          setConfirmDelete(null);
+        }}
+      />
     </div>
   );
 }

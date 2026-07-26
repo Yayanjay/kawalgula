@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import api from "../lib/api";
 import { useToast } from "../lib/toast";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 interface Template {
   key: string;
@@ -82,6 +83,7 @@ export default function TemplatesPage() {
   const [editing, setEditing] = useState<Template | null>(null);
   const [form, setForm] = useState({ title: "", body: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [resetKey, setResetKey] = useState<string | null>(null);
 
   const fetchTemplates = async () => {
     try {
@@ -133,7 +135,6 @@ export default function TemplatesPage() {
   };
 
   const handleReset = async (key: string) => {
-    if (!confirm("Reset template ini ke pengaturan awal?")) return;
     try {
       await api.post(`/templates/${key}/reset`);
       await fetchTemplates();
@@ -210,7 +211,7 @@ export default function TemplatesPage() {
                     Edit
                   </button>
                   <button
-                    onClick={() => handleReset(t.key)}
+                    onClick={() => setResetKey(t.key)}
                     className="rounded-md border border-red-200 text-red-600 px-3 py-1.5 text-sm hover:bg-red-50 transition-colors"
                   >
                     Reset
@@ -221,6 +222,18 @@ export default function TemplatesPage() {
           );
         })}
       </div>
+
+      <ConfirmDialog
+        open={!!resetKey}
+        onOpenChange={(o) => { if (!o) setResetKey(null); }}
+        title="Reset Template"
+        message="Reset template ini ke pengaturan awal?"
+        confirmLabel="Reset"
+        onConfirm={() => {
+          if (resetKey) handleReset(resetKey);
+          setResetKey(null);
+        }}
+      />
 
       {!filtered.length && (
         <p className="text-sm text-muted-foreground text-center py-12">Tidak ada template ditemukan</p>

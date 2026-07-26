@@ -9,6 +9,7 @@ import { Button } from "../components/ui/button";
 import { Calendar } from "../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { cn } from "../lib/utils";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 interface Patient {
   id: string;
@@ -32,6 +33,7 @@ export default function PatientsPage() {
   const [form, setForm] = useState({ name: "", waNumber: "", dob: "" });
   const [submitting, setSubmitting] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{ type: "treatment" | "delete"; id: string; current?: string } | null>(null);
 
   const fetchPatients = async () => {
     try {
@@ -109,8 +111,6 @@ export default function PatientsPage() {
 
   const handleTreatmentToggle = async (id: string, current: string) => {
     const next = current === "active" ? "completed" : "active";
-    const msg = next === "completed" ? "Tandai pasien ini selesai pengobatan?" : "Aktifkan kembali pengobatan pasien ini?";
-    if (!confirm(msg)) return;
     try {
       await api.patch(`/patients/${id}`, { treatmentStatus: next });
       fetchPatients();
@@ -121,7 +121,6 @@ export default function PatientsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Hapus pasien ini? Log konsumsi tetap tersimpan.")) return;
     try {
       await api.delete(`/patients/${id}`);
       fetchPatients();
@@ -197,19 +196,19 @@ export default function PatientsPage() {
                       </button>
                     )}
                     {p.treatmentStatus === "active" && (
-                      <button onClick={() => handleTreatmentToggle(p.id, p.treatmentStatus)} className="rounded p-1 hover:bg-muted text-blue-600" title="Tandai selesai">
+                      <button onClick={() => setConfirmDialog({ type: "treatment", id: p.id, current: p.treatmentStatus })} className="rounded p-1 hover:bg-muted text-blue-600" title="Tandai selesai">
                         <CheckCircle2 className="h-4 w-4" />
                       </button>
                     )}
                     {p.treatmentStatus === "completed" && (
-                      <button onClick={() => handleTreatmentToggle(p.id, p.treatmentStatus)} className="rounded p-1 hover:bg-muted text-green-600" title="Aktifkan kembali">
+                      <button onClick={() => setConfirmDialog({ type: "treatment", id: p.id, current: p.treatmentStatus })} className="rounded p-1 hover:bg-muted text-green-600" title="Aktifkan kembali">
                         <RotateCcw className="h-4 w-4" />
                       </button>
                     )}
                     <button onClick={() => openEdit(p)} className="rounded p-1 hover:bg-muted" title="Edit">
                       <Pencil className="h-4 w-4" />
                     </button>
-                    <button onClick={() => handleDelete(p.id)} className="rounded p-1 hover:bg-muted text-red-500" title="Hapus">
+                    <button onClick={() => setConfirmDialog({ type: "delete", id: p.id })} className="rounded p-1 hover:bg-muted text-red-500" title="Hapus">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -230,6 +229,21 @@ export default function PatientsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmDialog}
+        onOpenChange={(o) => { if (!o) setConfirmDialog(null); }}
+        title={confirmDialog?.type === "delete" ? "Hapus Pasien" : confirmDialog?.current === "active" ? "Selesai Pengobatan" : "Aktifkan Kembali"}
+        message={confirmDialog?.type === "delete" ? "Hapus pasien ini? Log konsumsi tetap tersimpan." : confirmDialog?.current === "active" ? "Tandai pasien ini selesai pengobatan?" : "Aktifkan kembali pengobatan pasien ini?"}
+        confirmLabel={confirmDialog?.type === "delete" ? "Hapus" : "Ya"}
+        destructive={confirmDialog?.type === "delete"}
+        onConfirm={() => {
+          if (!confirmDialog) return;
+          if (confirmDialog.type === "delete") handleDelete(confirmDialog.id);
+          else handleTreatmentToggle(confirmDialog.id, confirmDialog.current!);
+          setConfirmDialog(null);
+        }}
+      />
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowModal(false)}>

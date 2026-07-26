@@ -3,6 +3,7 @@ import api from "../lib/api";
 import { useToast } from "../lib/toast";
 import type { PaginationResponse } from "@kawalgula/shared";
 import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 
 interface Medication {
   id: string;
@@ -21,6 +22,7 @@ export default function MedicationsPage() {
   const [editing, setEditing] = useState<Medication | null>(null);
   const [form, setForm] = useState({ name: "", dosage: "", unit: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{ id: string } | null>(null);
 
   const fetchMeds = async () => {
     try {
@@ -71,7 +73,6 @@ export default function MedicationsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Hapus obat ini? Obat yang sudah di-assign ke pasien juga akan terhapus.")) return;
     try {
       await api.delete(`/medications/${id}`);
       fetchMeds();
@@ -120,7 +121,7 @@ export default function MedicationsPage() {
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
                     <button onClick={() => openEdit(m)} className="rounded p-1 hover:bg-muted"><Pencil className="h-4 w-4" /></button>
-                    <button onClick={() => handleDelete(m.id)} className="rounded p-1 hover:bg-muted text-red-500"><Trash2 className="h-4 w-4" /></button>
+                    <button onClick={() => setConfirmDialog({ id: m.id })} className="rounded p-1 hover:bg-muted text-red-500"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </td>
               </tr>
@@ -139,6 +140,19 @@ export default function MedicationsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmDialog}
+        onOpenChange={(o) => { if (!o) setConfirmDialog(null); }}
+        title="Hapus Obat"
+        message="Hapus obat ini? Obat yang sudah di-assign ke pasien juga akan terhapus."
+        confirmLabel="Hapus"
+        destructive
+        onConfirm={() => {
+          if (confirmDialog) handleDelete(confirmDialog.id);
+          setConfirmDialog(null);
+        }}
+      />
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowModal(false)}>
