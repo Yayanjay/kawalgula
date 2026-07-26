@@ -45,7 +45,7 @@ Puskesmas diabetes mellitus (DM) medication reminder + consumption tracking syst
 `pending` → `sent` → `confirmed` (patient took/skipped) OR `missed` (next dose fired) OR `failed` (max WAHA send retries).
 
 ## Template messages (admin-crud)
-Type enum: `enrollment`, `reminder`, `optin_confirm`, `usage_hint`, `already_opted_in`. Schema `TemplateMessage(type, key unique, title, body, buttonLabels[])`. Render with patient/medication variables — keep template-renderer in `packages/shared`.
+Type enum: `enrollment`, `reminder`, `optin_confirm`, `usage_hint`, `already_opted_in`, `confirmation`. Schema `TemplateMessage(type, key unique, title, body)`. Render with patient/medication variables — keep template-renderer in `packages/shared`.
 
 ## Monorepo layout (when scaffolded)
 ```

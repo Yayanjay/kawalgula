@@ -152,7 +152,7 @@ export class RemindersService {
           data: {
             patientId: reminder.patientId,
             kind: "reminder",
-            payload: { chatId, body, buttons: template.buttonLabels },
+            payload: { chatId, body },
             wahaMessageId,
             status: "sent",
             createdById: "SYSTEM",
@@ -230,7 +230,7 @@ export class RemindersService {
         data: {
           patientId: pm.patientId,
           kind: "reminder",
-          payload: { chatId, body, buttons: template.buttonLabels },
+          payload: { chatId, body },
           wahaMessageId,
           status: "sent",
           createdById: "SYSTEM",

@@ -80,7 +80,6 @@ export class TemplatesService {
       data: {
         ...(dto.title !== undefined && { title: dto.title }),
         ...(dto.body !== undefined && { body: dto.body }),
-        ...(dto.buttonLabels !== undefined && { buttonLabels: dto.buttonLabels }),
       },
     });
 
@@ -100,7 +99,6 @@ export class TemplatesService {
       data: {
         title: renderTemplate(template.title, variables),
         body: renderTemplate(template.body, variables),
-        buttonLabels: template.buttonLabels,
       },
     };
   }

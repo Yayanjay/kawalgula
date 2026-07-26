@@ -1,5 +1,4 @@
-import { IsString, IsOptional, IsArray, IsEnum } from "class-validator";
-import { TemplateType } from "@kawalgula/shared";
+import { IsString, IsOptional } from "class-validator";
 
 export class UpdateTemplateDto {
   @IsString()
@@ -9,9 +8,4 @@ export class UpdateTemplateDto {
   @IsString()
   @IsOptional()
   body?: string;
-
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  buttonLabels?: string[];
 }

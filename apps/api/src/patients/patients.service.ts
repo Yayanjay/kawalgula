@@ -283,7 +283,7 @@ export class PatientsService {
         data: {
           patientId,
           kind: "opt_in",
-          payload: { attempted, body, buttons: template.buttonLabels },
+          payload: { attempted, body },
           status: "sent",
           createdById: "SYSTEM",
         },
@@ -296,7 +296,7 @@ export class PatientsService {
         data: {
           patientId,
           kind: "opt_in",
-          payload: { attempted, body, buttons: template.buttonLabels },
+          payload: { attempted, body },
           status: "failed",
           error: "Gagal mengirim pesan opt-in",
           createdById: "SYSTEM",

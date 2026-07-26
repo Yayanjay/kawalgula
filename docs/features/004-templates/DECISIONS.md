@@ -25,8 +25,7 @@ Request:
 ```json
 {
   "title": "Pengingat Minum Obat",
-  "body": "Halo {{name}},\n\nSaatnya minum obat {{medication_name}} dosis {{dosage}} {{unit}}.",
-  "buttonLabels": ["Sudah minum", "Belum"]
+  "body": "Halo {{name}},\n\nSaatnya minum obat {{medication_name}} dosis {{dosage}} {{unit}}."
 }
 ```
 Response `200` — updated template. After update, future sends use new template body. `type` and `key` are immutable.
@@ -46,15 +45,14 @@ Response `200`:
   "message": "Success",
   "data": {
     "title": "Pengingat Minum Obat",
-    "body": "Halo Budi,\n\nSaatnya minum obat Metformin dosis 500mg tablet.",
-    "buttonLabels": ["Sudah minum", "Belum"]
+    "body": "Halo Budi,\n\nSaatnya minum obat Metformin dosis 500mg tablet."
   }
 }
 ```
 Uses `packages/shared/template-renderer/renderTemplate()` with the provided variables.
 
 ## Data model
-- `TemplateMessage(id, type(TemplateType), key unique, title, body, buttonLabels String[] default [], updatedAt)`
+- `TemplateMessage(id, type(TemplateType), key unique, title, body, updatedAt)`
 - `key` is the lookup identifier (e.g. `enrollment`, `reminder`, `optin_confirm`, `usage_hint`).
 - `type` enum: `enrollment`, `reminder`, `optin_confirm`, `usage_hint`, `already_opted_in`, `confirmation`.
 - Seed creates all 9 default templates (see `packages/prisma/seed.ts`).
@@ -62,7 +60,6 @@ Uses `packages/shared/template-renderer/renderTemplate()` with the provided vari
 ## Decisions
 - **`key` is the stable identifier, not `id`** — endpoints use `/templates/:key`. `key` is immutable.
 - **Template type is immutable** — changing `enrollment` to `reminder` would break expected behavior in opt-in flow. Delete + recreate is fine but not MVP.
-- **buttonLabels is a flat string array** — no per-button callbacks, no conditional buttons. Simple `["Label 1", "Label 2"]`.
 - **Renderer lives in `packages/shared`** — both API (for sending) and web dashboard (for preview) use the same `renderTemplate()` function. Variables are simple `{{...}}` replacement, no logic.
 - **Preview endpoint uses POST** — variables can be arbitrary JSON object; `POST` is appropriate.
 - **No template version history** — MVP just updates in-place. If audit trail is needed later, add a `TemplateRevision` table.
