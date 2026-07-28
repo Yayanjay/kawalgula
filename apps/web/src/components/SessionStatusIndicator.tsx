@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import api from "../lib/api";
 import { statusConfig, SessionStatus } from "../lib/sessionStatus";
 
@@ -36,20 +37,30 @@ export default function SessionStatusIndicator() {
     <button
       type="button"
       onClick={() => navigate("/whatsapp")}
-      className="mb-4 flex w-full items-center gap-2 rounded-md border px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted"
+      className={`mb-4 flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors hover:bg-muted ${config?.bg ?? "bg-muted/50"}`}
       title="Lihat status sesi WhatsApp"
     >
-      <span
-        className={`h-2.5 w-2.5 rounded-full ${
-          loading || !config ? "bg-gray-400" : config.color
-        }`}
-      />
-      <span className="flex-1 text-left">
-        {loading ? "Mengecek sesi…" : config?.label ?? "Tidak diketahui"}
-      </span>
-      {status?.status === "WORKING" && status.number && (
-        <span className="text-xs">{status.number}</span>
-      )}
+      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${config?.iconBg ?? "bg-gray-100"}`}>
+        {loading ? (
+          <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
+        ) : (
+          config?.icon && (
+            <config.icon
+              className={`h-4 w-4 ${config.iconColor} ${status?.status === "STARTING" || status?.status === "SCAN_QR_CODE" ? "animate-spin" : ""}`}
+            />
+          )
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium leading-tight text-foreground">
+          {loading ? "Mengecek sesi…" : config?.label ?? "Tidak diketahui"}
+        </p>
+        {status?.status === "WORKING" && status.number && (
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            {status.number}
+          </p>
+        )}
+      </div>
     </button>
   );
 }

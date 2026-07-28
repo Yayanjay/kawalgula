@@ -114,12 +114,30 @@ export default function WhatsappPage() {
       </div>
 
       {config && (
-        <div className="flex items-center gap-3 rounded-lg border p-4">
-          <div className={`h-3 w-3 rounded-full ${config.color}`} />
-          <div>
-            <p className="font-medium">{config.label}</p>
+        <div className={`flex items-center gap-4 rounded-xl border p-5 ${config.bg}`}>
+          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${config.iconBg}`}>
+            <config.icon
+              className={`h-6 w-6 ${config.iconColor} ${status?.status === "STARTING" || status?.status === "SCAN_QR_CODE" ? "animate-spin" : ""}`}
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-base">{config.label}</p>
+              {status?.status === "WORKING" && (
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex h-full w-2 rounded-full bg-green-500"></span>
+                </span>
+              )}
+            </div>
             {status?.status === "WORKING" && status.number && (
-              <p className="text-sm text-muted-foreground">{status.number}</p>
+              <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Smartphone className="h-4 w-4" />
+                <span className="font-medium">{status.number}</span>
+              </p>
+            )}
+            {status?.status !== "WORKING" && config.hint && (
+              <p className="mt-1 text-sm text-muted-foreground">{config.hint}</p>
             )}
           </div>
         </div>
