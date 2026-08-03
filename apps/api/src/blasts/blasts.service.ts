@@ -199,10 +199,6 @@ export class BlastsService {
 
         failCount++;
       }
-
-      if (patients.length > 1) {
-        await new Promise((r) => setTimeout(r, 3000));
-      }
     }
 
     const updated = await this.prisma.blast.update({
@@ -283,10 +279,6 @@ export class BlastsService {
         });
 
         newFail++;
-      }
-
-      if (failed.length > 1) {
-        await new Promise((r) => setTimeout(r, 3000));
       }
     }
 

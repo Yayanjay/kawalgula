@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, BadRequestException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import axios, { AxiosInstance } from "axios";
+import { WahaThrottleService } from "./waha-throttle.service";
 
 export interface WahaButton {
   type: "reply";
@@ -12,7 +13,10 @@ export class WahaClientService {
   private client: AxiosInstance;
   private sessionName: string;
 
-  constructor(private config: ConfigService) {
+  constructor(
+    private config: ConfigService,
+    private throttle: WahaThrottleService,
+  ) {
     const apiUrl = config.get<string>("WAHA_API_URL", "http://localhost:3001");
     const apiKey = config.get<string>("WAHA_API_KEY", "waha-api-key-change-me");
     this.sessionName = config.get<string>("WAHA_SESSION_NAME", "default");
@@ -40,6 +44,7 @@ export class WahaClientService {
     footer: string,
     buttons: WahaButton[],
   ): Promise<string> {
+    await this.throttle.acquire();
     await this.ensureSessionWorking();
     try {
       const { data } = await this.client.post("/api/sendButtons", {
@@ -63,6 +68,7 @@ export class WahaClientService {
     imageUrl: string,
     caption?: string,
   ): Promise<string> {
+    await this.throttle.acquire();
     await this.ensureSessionWorking();
     try {
       const { data } = await this.client.post("/api/sendImage", {
@@ -84,6 +90,7 @@ export class WahaClientService {
   }
 
   async sendText(chatId: string, text: string): Promise<string> {
+    await this.throttle.acquire();
     await this.ensureSessionWorking();
 
     let lastError: any;

@@ -93,6 +93,16 @@ async function main() {
       value: "30",
       name: "Interval percobaan ulang (menit)",
     },
+    {
+      key: "waha_max_messages_per_minute",
+      value: "20",
+      name: "Batas pengiriman pesan WA per menit",
+    },
+    {
+      key: "waha_max_burst",
+      value: "3",
+      name: "Burst pengiriman pesan WA (token bucket)",
+    },
   ];
 
   for (const param of params) {
