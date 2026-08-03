@@ -207,6 +207,31 @@ export class PatientsService {
       });
     }
 
+    if (dto.treatmentStatus === "active") {
+      const now = new Date();
+      const revive = await this.prisma.reminder.findMany({
+        where: {
+          patientId: id,
+          scheduledAt: { gt: now },
+          status: { in: ["missed", "pending", "failed"] },
+          consumptionLogs: { none: {} },
+        },
+        select: { id: true },
+      });
+      if (revive.length) {
+        await this.prisma.reminder.updateMany({
+          where: { id: { in: revive.map((r) => r.id) } },
+          data: {
+            status: "pending",
+            sentAt: null,
+            wahaMessageId: null,
+            nextRetryAt: null,
+            retryCount: 0,
+          },
+        });
+      }
+    }
+
     return { data: updated };
   }
 
