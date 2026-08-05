@@ -27,9 +27,10 @@ All WAHA sends (reminders + blasts) pass through `WahaThrottleService` (token bu
 `acquire()` schedules the refill timer *before* awaiting a token and rejects waiters after the max wait — the token bucket can never deadlock or block a caller forever.
 
 ### Delivery: per-recipient BullMQ jobs + watchdog recovery
-- `send(id)` creates recipient rows, sets `status=sending`, and enqueues one `send-recipient` job per recipient (`jobId: "send:<recipientId>"` dedupes re-enqueues).
+- `send(id)` creates recipient rows, sets `status=sending`, and enqueues one `send-recipient` job per recipient.
+- Job IDs: `send-<recipientId>` — no colons. BullMQ v5 rejects custom jobIds containing `:` (`Custom Id cannot contain :`), so the hyphen format is required. `removeOnComplete: true` / `removeOnFail: true` so terminal jobs never block a re-add with the same jobId; dedupe still prevents duplicates against waiting/active jobs.
 - The `BlastsProcessor` (WorkerHost) processes jobs sequentially; each job sends via WAHA, marks the recipient `sent|failed` (+ error), writes `OutboundMessage`, then recounts pending recipients — when zero pending remain it finalizes the blast (`status=sent, sentAt, successCount, failCount`).
-- `BlastsScheduler` registers a `blast-watchdog` cron (every 60s): blasts still `sending` with `updatedAt` older than `blast_stuck_minutes` (default 10) get pending recipients re-enqueued (dedupe-safe), or are finalized if no pending remain. Crashes mid-blast self-heal after restart — no manual SQL needed.
+- `BlastsScheduler` registers a `blast-watchdog` cron (every 60s): blasts still `sending` with `updatedAt` older than `blast_stuck_minutes` (default 10) get pending recipients checked against the queue (`getJob` — skip if already waiting/active) and re-enqueued if missing, or are finalized if no pending remain. Crashes mid-blast self-heal after restart — no manual SQL needed. Per-blast errors are caught and logged so one bad blast cannot fail the whole watchdog cycle.
 - `retryFailed(id)` resets `failed` recipients to `pending` (clears error), sets the blast back to `sending`, and re-enqueues their jobs; finalize flips it back to `sent`.
 
 ## Data model
@@ -110,7 +111,7 @@ New value added to existing `OutboundKind`: `blast`.
 2. Set `status = sending`, `totalRecipients`
 3. Query `Patient.findMany({ where: { consentStatus: opted_in, active: true } })`
 4. Bulk-create `BlastRecipient` rows (pending)
-5. Enqueue one `send-recipient` job per recipient (`jobId: send:<recipientId>`), return immediately
+5. Enqueue one `send-recipient` job per recipient (`jobId: send-<recipientId>`), return immediately
 6. Per job (background):
    - Load blast + recipient; skip if recipient is not `pending`
    - Render body via `renderTemplate()` with `{ name, waNumber }`
@@ -126,7 +127,7 @@ New value added to existing `OutboundKind`: `blast`.
 
 1. Validate `status == sent`, find `failed` recipients
 2. Reset them to `pending` (error cleared), set blast `status = sending`
-3. Re-enqueue their `send-recipient` jobs (dedupe by `jobId`)
+3. Re-enqueue their `send-recipient` jobs (dedupe by `jobId` against waiting/active jobs)
 4. Finalize flips the blast back to `sent` with updated counts
 
 ## Edge cases

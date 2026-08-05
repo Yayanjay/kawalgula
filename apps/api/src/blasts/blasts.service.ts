@@ -198,19 +198,48 @@ export class BlastsService {
   }
 
   async sendRecipient(blastId: string, recipientId: string) {
-    const [blast, recipient] = await Promise.all([
-      this.prisma.blast.findUnique({ where: { id: blastId } }),
-      this.prisma.blastRecipient.findUnique({ where: { id: recipientId } }),
-    ]);
+    let blast: any;
+    let recipient: any;
+    try {
+      [blast, recipient] = await Promise.all([
+        this.prisma.blast.findUnique({ where: { id: blastId } }),
+        this.prisma.blastRecipient.findUnique({ where: { id: recipientId } }),
+      ]);
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to load blast/recipient for ${recipientId}: ${error.message}`,
+      );
+      throw error;
+    }
 
-    if (!blast || !recipient || recipient.status !== "pending") {
+    if (!blast || !recipient) {
+      this.logger.warn(`Blast ${blastId} or recipient ${recipientId} not found, skipping`);
+      return;
+    }
+
+    if (recipient.status !== "pending") {
+      this.logger.warn(
+        `Recipient ${recipientId} is ${recipient.status}, skipping send`,
+      );
       return;
     }
 
     const chatId = `${recipient.waNumber}@c.us`;
-    const renderedBody = renderTemplate(blast.body, {
-      name: recipient.patientName,
-    });
+    let renderedBody: string;
+    try {
+      renderedBody = renderTemplate(blast.body, {
+        name: recipient.patientName,
+      });
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to render blast body for recipient ${recipientId}: ${error.message}`,
+      );
+      await this.prisma.blastRecipient.update({
+        where: { id: recipient.id },
+        data: { status: "failed", error: `Render gagal: ${error.message}` },
+      });
+      return;
+    }
 
     try {
       let wahaMessageId: string;
@@ -240,6 +269,8 @@ export class BlastsService {
           createdById: "SYSTEM",
         },
       });
+
+      this.logger.log(`Blast ${blastId}: sent to ${recipient.waNumber}`);
     } catch (error: any) {
       const message =
         error?.response?.data?.message || error.message || "Gagal mengirim";
@@ -259,6 +290,8 @@ export class BlastsService {
           createdById: "SYSTEM",
         },
       });
+
+      this.logger.error(`Blast ${blastId}: failed to send to ${recipient.waNumber}: ${message}`);
     }
 
     await this.finalizeIfDone(blastId);
@@ -279,24 +312,47 @@ export class BlastsService {
     });
 
     for (const blast of stuck) {
-      const pending = await this.prisma.blastRecipient.findMany({
-        where: { blastId: blast.id, status: "pending" },
-        select: { id: true },
-      });
+      try {
+        const pending = await this.prisma.blastRecipient.findMany({
+          where: { blastId: blast.id, status: "pending" },
+          select: { id: true },
+        });
 
-      if (!pending.length) {
-        await this.finalizeIfDone(blast.id);
-        continue;
+        if (!pending.length) {
+          await this.finalizeIfDone(blast.id);
+          continue;
+        }
+
+        const toEnqueue: string[] = [];
+        for (const recipient of pending) {
+          const jobId = this.recipientJobId(recipient.id);
+          const job = await this.blastsQueue.getJob(jobId);
+          if (!job) {
+            toEnqueue.push(recipient.id);
+          }
+        }
+
+        if (!toEnqueue.length) {
+          this.logger.log(
+            `Blast ${blast.id} sending: ${pending.length} recipients already queued`,
+          );
+          continue;
+        }
+
+        this.logger.warn(
+          `Blast ${blast.id} stuck in sending, re-enqueueing ${toEnqueue.length} of ${pending.length} pending recipients`,
+        );
+        await this.enqueueRecipients(blast.id, toEnqueue);
+      } catch (error: any) {
+        this.logger.error(
+          `Watchdog failed for blast ${blast.id}: ${error.message}`,
+        );
       }
-
-      this.logger.warn(
-        `Blast ${blast.id} stuck in sending, re-enqueueing ${pending.length} pending recipients`,
-      );
-      await this.enqueueRecipients(
-        blast.id,
-        pending.map((r) => r.id),
-      );
     }
+  }
+
+  private recipientJobId(recipientId: string): string {
+    return `send-${recipientId}`;
   }
 
   private async enqueueRecipients(blastId: string, recipientIds: string[]) {
@@ -305,9 +361,9 @@ export class BlastsService {
         name: "send-recipient",
         data: { blastId, recipientId },
         opts: {
-          jobId: `send:${recipientId}`,
-          removeOnComplete: { count: 1000 },
-          removeOnFail: { count: 500 },
+          jobId: this.recipientJobId(recipientId),
+          removeOnComplete: true,
+          removeOnFail: true,
         },
       })),
     );
