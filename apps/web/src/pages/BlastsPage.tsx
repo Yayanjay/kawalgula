@@ -65,6 +65,10 @@ export default function BlastsPage() {
   const [confirmSend, setConfirmSend] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [confirmRetry, setConfirmRetry] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const selectedBlastRef = useRef<Blast | null>(null);
+  const pageRef = useRef(page);
+  const [polling, setPolling] = useState(false);
 
   const displayed = showHistory ? blasts : blasts.filter((b) => b.status === "draft");
 
@@ -83,6 +87,57 @@ export default function BlastsPage() {
   };
 
   useEffect(() => { fetchBlasts(); }, [page]);
+
+  useEffect(() => {
+    selectedBlastRef.current = selectedBlast;
+  }, [selectedBlast]);
+
+  useEffect(() => {
+    pageRef.current = page;
+  }, [page]);
+
+  useEffect(() => () => stopPolling(), []);
+
+  const startPolling = () => {
+    if (pollRef.current) return;
+    setPolling(true);
+    pollRef.current = setInterval(async () => {
+      let anySending = false;
+      try {
+        const { data } = await api.post("/blasts/list", {
+          page: pageRef.current,
+          size: 50,
+          sort: [{ key: "createdAt", direction: "DESC" }],
+        });
+        setBlasts(data.data);
+        setPagination(data.pagination);
+        anySending = data.data.some((b: Blast) => b.status === "sending");
+      } catch {
+        // ignore
+      }
+
+      const current = selectedBlastRef.current;
+      if (current) {
+        try {
+          const { data } = await api.get(`/blasts/${current.id}`);
+          setSelectedBlast((prev) => (prev ? { ...prev, ...data.data } : prev));
+          setRecipients(data.data.recipients || []);
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!anySending) stopPolling();
+    }, 5000);
+  };
+
+  const stopPolling = () => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    setPolling(false);
+  };
 
   const openCreate = () => {
     setForm({ title: "", body: "", mediaUrl: "", mediaType: "" });
@@ -129,6 +184,7 @@ export default function BlastsPage() {
     try {
       await api.post(`/blasts/${id}/send`);
       fetchBlasts();
+      startPolling();
       toast("Broadcast sedang dikirim");
     } catch (err: any) {
       toast(err.response?.data?.message || "Gagal mengirim broadcast", "error");
@@ -151,7 +207,8 @@ export default function BlastsPage() {
     try {
       await api.post(`/blasts/${id}/retry-failed`);
       fetchBlasts();
-      toast("Pengiriman ulang selesai");
+      startPolling();
+      toast("Pengiriman ulang dimulai");
     } catch (err: any) {
       toast(err.response?.data?.message || "Gagal mengirim ulang", "error");
     }
@@ -279,6 +336,11 @@ export default function BlastsPage() {
             {selectedBlast.totalRecipients} penerima &middot; {selectedBlast.successCount} berhasil &middot; {selectedBlast.failCount} gagal
             {selectedBlast.sentAt && <> &middot; {new Date(selectedBlast.sentAt).toLocaleString("id")}</>}
           </div>
+          {selectedBlast.status === "sending" && (
+            <div className="flex items-center gap-2 text-xs text-blue-600">
+              <RefreshCw className="h-3 w-3 animate-spin" /> Sedang mengirim, memperbarui otomatis...
+            </div>
+          )}
           {recipients.length > 0 && (
             <div className="rounded border">
               <table className="w-full text-xs">

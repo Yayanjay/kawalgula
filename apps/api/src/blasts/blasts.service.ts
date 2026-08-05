@@ -1,22 +1,29 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { InjectQueue } from "@nestjs/bullmq";
+import { Queue } from "bullmq";
 import { PrismaService } from "../prisma/prisma.service";
 import { WahaClientService } from "../waha-client/waha-client.service";
+import { GeneralParametersService } from "../general-parameters/general-parameters.service";
 import { renderTemplate, PaginationRequest } from "@kawalgula/shared";
 import { CreateBlastDto } from "./dto/create-blast.dto";
 
 @Injectable()
 export class BlastsService {
+  private readonly logger = new Logger(BlastsService.name);
   private mediaBaseUrl: string;
 
   constructor(
     private prisma: PrismaService,
     private waha: WahaClientService,
     config: ConfigService,
+    private generalParameters: GeneralParametersService,
+    @InjectQueue("blasts") private blastsQueue: Queue,
   ) {
     this.mediaBaseUrl = config.get<string>(
       "MEDIA_BASE_URL",
@@ -136,81 +143,23 @@ export class BlastsService {
       },
     });
 
-    const recipientData = patients.map((p) => ({
-      blastId: id,
-      patientId: p.id,
-      patientName: p.name,
-      waNumber: p.waNumber,
-    }));
-
-    await this.prisma.blastRecipient.createMany({ data: recipientData });
-
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const patient of patients) {
-      const chatId = `${patient.waNumber}@c.us`;
-      const renderedBody = renderTemplate(blast.body, {
-        name: patient.name,
-      });
-
-      try {
-        let wahaMessageId: string;
-        if (blast.mediaUrl) {
-          const absoluteUrl = this.resolveUrl(blast.mediaUrl);
-          wahaMessageId = await this.waha.sendImage(chatId, absoluteUrl, renderedBody);
-        } else {
-          wahaMessageId = await this.waha.sendText(chatId, renderedBody);
-        }
-
-        await this.prisma.blastRecipient.updateMany({
-          where: { blastId: id, patientId: patient.id },
-          data: { status: "sent", wahaMessageId, sentAt: new Date() },
-        });
-
-        await this.prisma.outboundMessage.create({
-          data: {
-            patientId: patient.id,
-            kind: "blast",
-            payload: { blastId: id, body: renderedBody, mediaUrl: blast.mediaUrl },
-            wahaMessageId,
-            status: "sent",
-            createdById: "SYSTEM",
-          },
-        });
-
-        successCount++;
-      } catch (error: any) {
-        await this.prisma.blastRecipient.updateMany({
-          where: { blastId: id, patientId: patient.id },
-          data: { status: "failed", error: error.message },
-        });
-
-        await this.prisma.outboundMessage.create({
-          data: {
-            patientId: patient.id,
-            kind: "blast",
-            payload: { blastId: id, body: renderedBody, mediaUrl: blast.mediaUrl },
-            status: "failed",
-            error: error.message,
-            createdById: "SYSTEM",
-          },
-        });
-
-        failCount++;
-      }
-    }
-
-    const updated = await this.prisma.blast.update({
-      where: { id },
-      data: {
-        status: "sent",
-        sentAt: new Date(),
-        successCount,
-        failCount,
-      },
+    await this.prisma.blastRecipient.createMany({
+      data: patients.map((p) => ({
+        blastId: id,
+        patientId: p.id,
+        patientName: p.name,
+        waNumber: p.waNumber,
+      })),
     });
 
+    const recipients = await this.prisma.blastRecipient.findMany({
+      where: { blastId: id, status: "pending" },
+      select: { id: true },
+    });
+
+    await this.enqueueRecipients(id, recipients.map((r) => r.id));
+
+    const updated = await this.prisma.blast.findUnique({ where: { id } });
     return { data: updated };
   }
 
@@ -225,79 +174,175 @@ export class BlastsService {
 
     const failed = await this.prisma.blastRecipient.findMany({
       where: { blastId: id, status: "failed" },
+      select: { id: true },
     });
 
     if (!failed.length) {
       throw new BadRequestException("Tidak ada penerima yang gagal");
     }
 
-    let newSuccess = 0;
-    let newFail = 0;
+    await this.prisma.blastRecipient.updateMany({
+      where: { blastId: id, status: "failed" },
+      data: { status: "pending", error: null },
+    });
 
-    for (const recipient of failed) {
-      const chatId = `${recipient.waNumber}@c.us`;
-      const renderedBody = renderTemplate(blast.body, {
-        name: recipient.patientName,
-      });
+    await this.prisma.blast.update({
+      where: { id },
+      data: { status: "sending" },
+    });
 
-      try {
-        let wahaMessageId: string;
-        if (blast.mediaUrl) {
-          const absoluteUrl = this.resolveUrl(blast.mediaUrl);
-          wahaMessageId = await this.waha.sendImage(chatId, absoluteUrl, renderedBody);
-        } else {
-          wahaMessageId = await this.waha.sendText(chatId, renderedBody);
-        }
+    await this.enqueueRecipients(id, failed.map((r) => r.id));
 
-        await this.prisma.blastRecipient.update({
-          where: { id: recipient.id },
-          data: { status: "sent", wahaMessageId, sentAt: new Date(), error: null },
-        });
+    const updated = await this.prisma.blast.findUnique({ where: { id } });
+    return { data: updated };
+  }
 
-        await this.prisma.outboundMessage.create({
-          data: {
-            patientId: recipient.patientId,
-            kind: "blast",
-            payload: { blastId: id, body: renderedBody, mediaUrl: blast.mediaUrl },
-            wahaMessageId,
-            status: "sent",
-            createdById: "SYSTEM",
-          },
-        });
+  async sendRecipient(blastId: string, recipientId: string) {
+    const [blast, recipient] = await Promise.all([
+      this.prisma.blast.findUnique({ where: { id: blastId } }),
+      this.prisma.blastRecipient.findUnique({ where: { id: recipientId } }),
+    ]);
 
-        newSuccess++;
-      } catch (error: any) {
-        await this.prisma.outboundMessage.create({
-          data: {
-            patientId: recipient.patientId,
-            kind: "blast",
-            payload: { blastId: id, body: renderedBody, mediaUrl: blast.mediaUrl },
-            status: "failed",
-            error: error.message,
-            createdById: "SYSTEM",
-          },
-        });
-
-        newFail++;
-      }
+    if (!blast || !recipient || recipient.status !== "pending") {
+      return;
     }
 
-    const remainingFailed = await this.prisma.blastRecipient.count({
-      where: { blastId: id, status: "failed" },
+    const chatId = `${recipient.waNumber}@c.us`;
+    const renderedBody = renderTemplate(blast.body, {
+      name: recipient.patientName,
     });
 
-    const totalSent = await this.prisma.blastRecipient.count({
-      where: { blastId: id, status: "sent" },
-    });
+    try {
+      let wahaMessageId: string;
+      if (blast.mediaUrl) {
+        const absoluteUrl = this.resolveUrl(blast.mediaUrl);
+        wahaMessageId = await this.waha.sendImage(
+          chatId,
+          absoluteUrl,
+          renderedBody,
+        );
+      } else {
+        wahaMessageId = await this.waha.sendText(chatId, renderedBody);
+      }
 
-    const updated = await this.prisma.blast.update({
-      where: { id },
-      data: {
-        successCount: totalSent,
-        failCount: remainingFailed,
+      await this.prisma.blastRecipient.update({
+        where: { id: recipient.id },
+        data: { status: "sent", wahaMessageId, sentAt: new Date(), error: null },
+      });
+
+      await this.prisma.outboundMessage.create({
+        data: {
+          patientId: recipient.patientId,
+          kind: "blast",
+          payload: { blastId, body: renderedBody, mediaUrl: blast.mediaUrl },
+          wahaMessageId,
+          status: "sent",
+          createdById: "SYSTEM",
+        },
+      });
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message || error.message || "Gagal mengirim";
+
+      await this.prisma.blastRecipient.update({
+        where: { id: recipient.id },
+        data: { status: "failed", error: message },
+      });
+
+      await this.prisma.outboundMessage.create({
+        data: {
+          patientId: recipient.patientId,
+          kind: "blast",
+          payload: { blastId, body: renderedBody, mediaUrl: blast.mediaUrl },
+          status: "failed",
+          error: message,
+          createdById: "SYSTEM",
+        },
+      });
+    }
+
+    await this.finalizeIfDone(blastId);
+  }
+
+  async watchdog() {
+    const stuckMinutes = await this.generalParameters.getInt(
+      "blast_stuck_minutes",
+      10,
+    );
+    const cutoff = new Date(Date.now() - stuckMinutes * 60 * 1000);
+
+    const stuck = await this.prisma.blast.findMany({
+      where: {
+        status: "sending",
+        updatedAt: { lt: cutoff },
       },
     });
 
-    return { data: updated };
+    for (const blast of stuck) {
+      const pending = await this.prisma.blastRecipient.findMany({
+        where: { blastId: blast.id, status: "pending" },
+        select: { id: true },
+      });
+
+      if (!pending.length) {
+        await this.finalizeIfDone(blast.id);
+        continue;
+      }
+
+      this.logger.warn(
+        `Blast ${blast.id} stuck in sending, re-enqueueing ${pending.length} pending recipients`,
+      );
+      await this.enqueueRecipients(
+        blast.id,
+        pending.map((r) => r.id),
+      );
+    }
+  }
+
+  private async enqueueRecipients(blastId: string, recipientIds: string[]) {
+    await this.blastsQueue.addBulk(
+      recipientIds.map((recipientId) => ({
+        name: "send-recipient",
+        data: { blastId, recipientId },
+        opts: {
+          jobId: `send:${recipientId}`,
+          removeOnComplete: { count: 1000 },
+          removeOnFail: { count: 500 },
+        },
+      })),
+    );
+  }
+
+  private async finalizeIfDone(blastId: string) {
+    const pending = await this.prisma.blastRecipient.count({
+      where: { blastId, status: "pending" },
+    });
+    if (pending > 0) return;
+
+    const blast = await this.prisma.blast.findUnique({ where: { id: blastId } });
+    if (!blast || blast.status !== "sending") return;
+
+    const [successCount, failCount] = await Promise.all([
+      this.prisma.blastRecipient.count({
+        where: { blastId, status: "sent" },
+      }),
+      this.prisma.blastRecipient.count({
+        where: { blastId, status: "failed" },
+      }),
+    ]);
+
+    await this.prisma.blast.update({
+      where: { id: blastId },
+      data: {
+        status: "sent",
+        sentAt: new Date(),
+        successCount,
+        failCount,
+      },
+    });
+
+    this.logger.log(
+      `Blast ${blastId} finalized: ${successCount} sent, ${failCount} failed`,
+    );
   }
 }

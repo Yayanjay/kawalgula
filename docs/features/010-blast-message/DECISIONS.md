@@ -13,13 +13,24 @@ Blast messages are ad-hoc campaigns, not reusable templates wired to code events
 MVP sends to all patients with `consentStatus = opted_in AND active = true`. No filtering UI. Future versions can add medication/date range filters.
 
 ### Send mode: immediate only
-No scheduling for MVP. Admin clicks "Kirim" and messages fire immediately with a 3-second delay between each to avoid WhatsApp rate-limiting.
+No scheduling for MVP. Admin clicks "Kirim" and recipient jobs are enqueued immediately on the BullMQ `blasts` queue. `POST /send` returns right away with `status=sending`; delivery continues in the background via per-recipient queue jobs.
 
 ### Image: optional
 Blasts can be text-only or text + image. Image uploaded via a dedicated upload endpoint, stored on local filesystem, served as static file. WAHA fetches the image via Docker internal URL (`http://api:3000/uploads/...`).
 
-### Delay: 3 seconds between sends
-Conservative rate to avoid WhatsApp flagging. ~20 messages/minute. Configurable via `GeneralParameter` later.
+### Rate limiting: shared token-bucket throttle (not per-blast delay)
+All WAHA sends (reminders + blasts) pass through `WahaThrottleService` (token bucket, 250ms refill interval). Configurable via `GeneralParameter`:
+- `waha_max_messages_per_minute` (default 20) — refill rate; `<= 0` disables the limiter
+- `waha_max_burst` (default 3) — bucket capacity
+- `waha_throttle_max_wait_ms` (default 60000) — max time a caller waits for a token before failing; prevents hangs
+
+`acquire()` schedules the refill timer *before* awaiting a token and rejects waiters after the max wait — the token bucket can never deadlock or block a caller forever.
+
+### Delivery: per-recipient BullMQ jobs + watchdog recovery
+- `send(id)` creates recipient rows, sets `status=sending`, and enqueues one `send-recipient` job per recipient (`jobId: "send:<recipientId>"` dedupes re-enqueues).
+- The `BlastsProcessor` (WorkerHost) processes jobs sequentially; each job sends via WAHA, marks the recipient `sent|failed` (+ error), writes `OutboundMessage`, then recounts pending recipients — when zero pending remain it finalizes the blast (`status=sent, sentAt, successCount, failCount`).
+- `BlastsScheduler` registers a `blast-watchdog` cron (every 60s): blasts still `sending` with `updatedAt` older than `blast_stuck_minutes` (default 10) get pending recipients re-enqueued (dedupe-safe), or are finalized if no pending remain. Crashes mid-blast self-heal after restart — no manual SQL needed.
+- `retryFailed(id)` resets `failed` recipients to `pending` (clears error), sets the blast back to `sending`, and re-enqueues their jobs; finalize flips it back to `sent`.
 
 ## Data model
 
@@ -96,23 +107,36 @@ New value added to existing `OutboundKind`: `blast`.
 ### Send flow
 
 1. Load blast, validate `status == draft`
-2. Set `status = sending`
+2. Set `status = sending`, `totalRecipients`
 3. Query `Patient.findMany({ where: { consentStatus: opted_in, active: true } })`
 4. Bulk-create `BlastRecipient` rows (pending)
-5. Loop recipients with 3s delay:
+5. Enqueue one `send-recipient` job per recipient (`jobId: send:<recipientId>`), return immediately
+6. Per job (background):
+   - Load blast + recipient; skip if recipient is not `pending`
    - Render body via `renderTemplate()` with `{ name, waNumber }`
    - If `mediaUrl`: `wahaClient.sendImage(chatId, imageUrl, renderedBody)`
    - Else: `wahaClient.sendText(chatId, renderedBody)`
    - On success: update recipient `status=sent, wahaMessageId, sentAt`
    - On failure: update recipient `status=failed, error`
    - Create `OutboundMessage(kind=blast, payload, wahaMessageId)`
-6. Update blast `successCount, failCount, sentAt, status=sent`
+   - Recount pending; if zero → finalize: `status=sent, sentAt, successCount, failCount`
+7. Watchdog (every 60s): blasts `sending` for > `blast_stuck_minutes` → re-enqueue pending recipients or finalize
+
+### Retry flow
+
+1. Validate `status == sent`, find `failed` recipients
+2. Reset them to `pending` (error cleared), set blast `status = sending`
+3. Re-enqueue their `send-recipient` jobs (dedupe by `jobId`)
+4. Finalize flips the blast back to `sent` with updated counts
 
 ## Edge cases
 
 - **No opted-in patients**: `POST /send` returns error "Tidak ada pasien yang aktif dan sudah setuju."
 - **Blast already sent**: `POST /send` on non-draft blast returns `BadRequest("Broadcast sudah dikirim")`.
-- **WAHA failure mid-blast**: blast remains `sending`, successful recipients are marked `sent`, failed ones are `failed`. Admin can inspect per-recipient status.
+- **WAHA failure mid-blast**: recipient is marked `failed` with the WAHA error body (e.g. `No LID for user`); the rest continue. Admin can retry failed recipients per blast.
+- **Process crash mid-blast**: blast stays `sending`; after restart the watchdog re-enqueues pending recipients (BullMQ persists jobs in Redis and dedupes by `jobId`), so no manual recovery is needed.
+- **Stuck blast (no pending, not finalized)**: watchdog finalizes it to `sent` with rolled-up counts.
+- **Rate limiter queue backup**: waiters fail after `waha_throttle_max_wait_ms` instead of hanging the worker forever.
 - **Upload fails**: handled by multer, returns appropriate HTTP error.
 - **Image too large**: 5MB limit enforced by multer.
 - **Unsupported image type**: rejected by multer file filter.
@@ -120,7 +144,7 @@ New value added to existing `OutboundKind`: `blast`.
 
 ## Anti-ban
 
-- 3-second delay between WAHA sends
+- Token-bucket rate limiter (20 msg/min default, burst 3) shared across all WAHA sends — no hardcoded inter-send delay
 - Every message includes `{{name}}` in body — no generic bulk messages
 - Only sent to opted-in patients (explicit consent)
 

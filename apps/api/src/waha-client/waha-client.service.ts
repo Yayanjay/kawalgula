@@ -37,6 +37,14 @@ export class WahaClientService {
     }
   }
 
+  private formatWahaError(error: any): string {
+    const data = error?.response?.data;
+    if (data && typeof data === "object") {
+      return JSON.stringify(data).slice(0, 300);
+    }
+    return String(data || error?.message || "unknown").slice(0, 300);
+  }
+
   async sendButtons(
     chatId: string,
     header: string,
@@ -58,7 +66,7 @@ export class WahaClientService {
       return data?.id ?? "unknown";
     } catch (error: any) {
       throw new InternalServerErrorException(
-        `Gagal mengirim pesan WA: ${error.response?.data?.message || error.message}`,
+        `Gagal mengirim pesan WA: ${this.formatWahaError(error)}`,
       );
     }
   }
@@ -84,7 +92,7 @@ export class WahaClientService {
       return (id as string) ?? "unknown";
     } catch (error: any) {
       throw new InternalServerErrorException(
-        `Gagal mengirim gambar WA: ${error.response?.data?.message || error.message}`,
+        `Gagal mengirim gambar WA: ${this.formatWahaError(error)}`,
       );
     }
   }
@@ -114,12 +122,12 @@ export class WahaClientService {
           continue;
         }
         throw new InternalServerErrorException(
-          `Gagal mengirim pesan teks: ${error.response?.data?.message || error.message}`,
+          `Gagal mengirim pesan teks: ${this.formatWahaError(error)}`,
         );
       }
     }
     throw new InternalServerErrorException(
-      `Gagal mengirim pesan teks: ${lastError?.response?.data?.message || lastError?.message}`,
+      `Gagal mengirim pesan teks: ${this.formatWahaError(lastError)}`,
     );
   }
 

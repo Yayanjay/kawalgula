@@ -103,6 +103,16 @@ async function main() {
       value: "3",
       name: "Burst pengiriman pesan WA (token bucket)",
     },
+    {
+      key: "waha_throttle_max_wait_ms",
+      value: "60000",
+      name: "Batas waktu menunggu antrian WA (ms)",
+    },
+    {
+      key: "blast_stuck_minutes",
+      value: "10",
+      name: "Menit sebelum broadcast dianggap macet (watchdog)",
+    },
   ];
 
   for (const param of params) {
